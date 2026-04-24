@@ -1,0 +1,25 @@
+{
+"page": 360,
+"max_verse": 41,
+"full_list": [
+29,
+30,
+31,
+32,
+33,
+34,
+35,
+36,
+37,
+38,
+39,
+40,
+41
+],
+"alternatives": [],
+"chapter_starts_here": true,
+"confidence": "high",
+"notes": "",
+"raw": "```json\n{\n  \"verses\": [\n    {\"n\": 29, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 30, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 31, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 32, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 33, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 34, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 35, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 36, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 37, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 38, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 39, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 40, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 41, \"column\": \"right\", \"alternatives\": []}\n  ],\n  \"chapter_starts_here\": true,\n  \"confidence\": \"high\",\n  \"notes\": \"\",\n  \"last_verse_of_previous_chapter\": 28,\n  \"last_verse_of_new_chapter\": 41\n}\n```",
+"error": ""
+}

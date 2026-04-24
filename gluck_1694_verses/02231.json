@@ -1,0 +1,30 @@
+{
+"page": 2231,
+"max_verse": 46,
+"full_list": [
+43,
+44,
+45,
+46,
+1,
+2,
+3,
+4,
+5,
+6,
+7,
+8,
+9,
+10,
+11,
+12,
+13,
+14
+],
+"alternatives": [],
+"chapter_starts_here": true,
+"confidence": "high",
+"notes": "",
+"raw": "{\n  \"verses\": [\n    {\"n\": 43, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 44, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 45, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 46, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 1, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 2, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 3, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 4, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 5, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 6, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 7, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 8, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 9, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 10, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 11, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 12, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 13, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 14, \"column\": \"right\", \"alternatives\": []}\n  ],\n  \"chapter_starts_here\": true,\n  \"confidence\": \"high\",\n  \"notes\": \"\",\n  \"last_verse_of_previous_chapter\": 46,\n  \"last_verse_of_new_chapter\": 14\n}",
+"error": ""
+}

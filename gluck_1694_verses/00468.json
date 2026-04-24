@@ -1,0 +1,23 @@
+{
+"page": 468,
+"max_verse": 68,
+"full_list": [
+63,
+64,
+65,
+66,
+67,
+68,
+1,
+2,
+3,
+4,
+5
+],
+"alternatives": [],
+"chapter_starts_here": true,
+"confidence": "high",
+"notes": "",
+"raw": "```json\n{\n  \"verses\": [\n    {\"n\": 63, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 64, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 65, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 66, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 67, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 68, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 1, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 2, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 3, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 4, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 5, \"column\": \"right\", \"alternatives\": []}\n  ],\n  \"chapter_starts_here\": true,\n  \"confidence\": \"high\",\n  \"notes\": \"\"\n}\n```",
+"error": ""
+}

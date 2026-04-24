@@ -1,0 +1,21 @@
+{
+"page": 592,
+"max_verse": 36,
+"full_list": [
+29,
+30,
+31,
+32,
+33,
+34,
+35,
+36,
+1
+],
+"alternatives": [],
+"chapter_starts_here": true,
+"confidence": "high",
+"notes": "",
+"raw": "```json\n{\n  \"verses\": [\n    {\"n\": 29, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 30, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 31, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 32, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 33, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 34, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 35, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 36, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 1, \"column\": \"right\", \"alternatives\": []}\n  ],\n  \"chapter_starts_here\": true,\n  \"confidence\": \"high\",\n  \"notes\": \"\"\n}\n```",
+"error": ""
+}

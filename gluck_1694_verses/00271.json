@@ -1,0 +1,28 @@
+{
+"page": 271,
+"max_verse": 20,
+"full_list": [
+1,
+12,
+14,
+15,
+16,
+17,
+18,
+19,
+20
+],
+"alternatives": [
+[
+12,
+[
+13
+]
+]
+],
+"chapter_starts_here": false,
+"confidence": "high",
+"notes": "",
+"raw": "{\n  \"verses\": [\n    {\"n\": 1, \"column\": \"left\", \"alternatives\": []},\n    {\"n\": 12, \"column\": \"right\", \"alternatives\": [13]},\n    {\"n\": 14, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 15, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 16, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 17, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 18, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 19, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 20, \"column\": \"right\", \"alternatives\": []}\n  ],\n  \"chapter_starts_here\": false,\n  \"confidence\": \"high\",\n  \"notes\": \"\"\n}",
+"error": ""
+}

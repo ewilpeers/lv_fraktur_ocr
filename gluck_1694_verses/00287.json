@@ -1,0 +1,20 @@
+{
+"page": 287,
+"max_verse": 39,
+"full_list": [
+32,
+33,
+34,
+35,
+36,
+37,
+38,
+39
+],
+"alternatives": [],
+"chapter_starts_here": false,
+"confidence": "high",
+"notes": "",
+"raw": "```json\n{\n  \"verses\": [\n    {\"n\": 32, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 33, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 34, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 35, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 36, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 37, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 38, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 39, \"column\": \"right\", \"alternatives\": []}\n  ],\n  \"chapter_starts_here\": false,\n  \"confidence\": \"high\",\n  \"notes\": \"\"\n}\n```",
+"error": ""
+}

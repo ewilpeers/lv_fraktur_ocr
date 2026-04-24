@@ -1,0 +1,20 @@
+{
+"page": 219,
+"max_verse": 40,
+"full_list": [
+38,
+39,
+40,
+1,
+2,
+3,
+4,
+5
+],
+"alternatives": [],
+"chapter_starts_here": true,
+"confidence": "high",
+"notes": "",
+"raw": "{\n  \"verses\": [\n    {\"n\": 38, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 39, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 40, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 1, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 2, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 3, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 4, \"column\": \"right\", \"alternatives\": []},\n    {\"n\": 5, \"column\": \"right\", \"alternatives\": []}\n  ],\n  \"chapter_starts_here\": true,\n  \"confidence\": \"high\",\n  \"notes\": \"\",\n  \"last_verse_of_previous_chapter\": 40,\n  \"last_verse_of_new_chapter\": 5\n}",
+"error": ""
+}
