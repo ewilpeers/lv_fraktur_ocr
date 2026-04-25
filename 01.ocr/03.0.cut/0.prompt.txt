@@ -1,0 +1,12 @@
+now could you create jupyter notebook
+thats purpuse is to find vertical longest line, 
+that most lilely will not be orthic (straight)
+but will be uniterputed most of the cases
+the line is dark, but not necceserally black.
+and then cuts the image on that line trying not to go out of it
+and then the missing pixels till the straight vertical imaginary line it fills with color value 
+#E01AD1 so that the parts are padded a bit parallelograms
+and then puts the right half under the left and stores as a new image.
+besides before that filling the line, but not nearby letters if any, with pure white color 
+#FFFFFF
+add also a seperate H1 (# ) cell with loop under it that goes through folder and stores results in target folder
