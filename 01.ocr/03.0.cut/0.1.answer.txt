@@ -1,0 +1,9 @@
+@claude
+What I found and fixed
+The default parameters from my first notebook didn't work on the real Glück 1694 scans. I rebuilt the detection logic and tested across all four samples. The new version (in split_on_vertical_line.ipynb) has:
+
+Flank-aware seed scoring. Score each column as dark_count − mean(dark_count of ±30px neighbors). Thin printed dividers beat fat text columns. Fixes gold_00021 which was previously locking onto a text column at x=490.
+Cumulative drift limit. The trace can't wander more than max_drift_from_seed=15px from the seed column. If it tries (because the divider ended and it's catching text edges), it counts as a gap.
+Edge cleanup. After tracing, trim rows at the run boundaries whose x is more than edge_trim_px=8 from the median.
+Channel selection. gray_mode='blue' switches to the blue channel — but my testing showed this actually hurts on the brown-paper raww scans because the paper background's blue value is so low that everything counts as dark. Gray channel + threshold 140 + larger gap tolerance works much better.
+Larger gap tolerance. Bumped max_gap_rows from 80 to 200. This was the real win for the raww scans: faded divider sections on old paper routinely span 100+ rows. With 200, all four samples hit 96–100% page coverage.

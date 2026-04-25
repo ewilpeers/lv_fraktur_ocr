@@ -10,3 +10,13 @@ and then puts the right half under the left and stores as a new image.
 besides before that filling the line, but not nearby letters if any, with pure white color 
 #FFFFFF
 add also a seperate H1 (# ) cell with loop under it that goes through folder and stores results in target folder
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+oh i forgot the test samples. sorry. please test on these:
+https://t.noit.pro/gluck_1694/gold/00016.jpg
+https://t.noit.pro/gluck_1694/gold/00021.jpg
+and these:
+https://t.noit.pro/gluck_1694/raww/bsb10914821_00018.jpg
+https://t.noit.pro/gluck_1694/raww/bsb10914821_00074.jpg
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
