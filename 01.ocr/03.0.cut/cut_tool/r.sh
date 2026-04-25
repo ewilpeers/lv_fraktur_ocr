@@ -1,1 +1,1 @@
-mamba install -y numpy pillow tk
+mamba install -y numpy pillow tk opencv
