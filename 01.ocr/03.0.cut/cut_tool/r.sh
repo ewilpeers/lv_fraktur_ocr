@@ -1,0 +1,1 @@
+mamba install -y numpy pillow tk
