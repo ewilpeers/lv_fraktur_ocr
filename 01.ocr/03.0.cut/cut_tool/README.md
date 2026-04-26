@@ -13,6 +13,11 @@ Cuts two-column scanned pages along their printed vertical divider, whitens the 
 | `export_svg_overlays.py` | Json + images to svgs Ctrl+Shift+L, nav to edit this, f2 |
 All five must live in the same folder (the GUI and notebook both `import line_detection`).
 
+example with user "user":
+```cmd
+python import_svg_overlays.py C:\Users\user\Pictures\BBL\gld\svg_overlays C:\Users\user\Pictures\BBL\gld
+```
+
 ## Quick start
 
 ```
