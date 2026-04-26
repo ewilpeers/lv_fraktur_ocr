@@ -1,0 +1,601 @@
+{
+  "config_used": {
+    "dark_threshold": 140,
+    "gray_mode": "gray",
+    "search_band": [
+      0.3,
+      0.7
+    ],
+    "flank_width": 30,
+    "trace_max_jump": 4,
+    "max_gap_rows": 200,
+    "max_drift_from_seed": 15,
+    "edge_trim_px": 8,
+    "whiten_half_width": 3,
+    "letter_guard_distance": 14,
+    "pad_color_hex": "#E01AD1",
+    "vertical_pref_radius": 3,
+    "vertical_snap_threshold": 4,
+    "multipass_passes": 4,
+    "multipass_drift_threshold": 3,
+    "multipass_min_seg_len": 8,
+    "multipass_line_tolerance": 1,
+    "multipass_context_window": 50,
+    "iso_vk_rows": 20,
+    "iso_inner_min": 35,
+    "iso_flank_offset": 6,
+    "iso_flank_max": 6,
+    "iso_strict_min": 200,
+    "iso_min_anchors": 100,
+    "iso_inlier_band": 3,
+    "iso_residual_threshold": 2.5,
+    "iso_extrap_threshold": 1.5,
+    "iso_min_span_frac": 0.3,
+    "iso_threshold_sweep": [
+      110,
+      125,
+      140
+    ],
+    "iso_medium_vk_rows": 10,
+    "iso_medium_inner_min": 15,
+    "iso_medium_flank_max": 8
+  },
+  "entries": {
+    "bsb10914821_01150.jpg": {
+      "seed_x": 1055,
+      "autogen": true
+    },
+    "bsb10914821_01151.jpg": {
+      "seed_x": 967,
+      "autogen": true
+    },
+    "bsb10914821_01152.jpg": {
+      "seed_x": 1089,
+      "autogen": false
+    },
+    "bsb10914821_01153.jpg": {
+      "seed_x": 920,
+      "autogen": true
+    },
+    "bsb10914821_01154.jpg": {
+      "seed_x": 1083,
+      "autogen": false
+    },
+    "bsb10914821_01155.jpg": {
+      "seed_x": 941,
+      "autogen": true
+    },
+    "bsb10914821_01156.jpg": {
+      "seed_x": 1060,
+      "autogen": true
+    },
+    "bsb10914821_01157.jpg": {
+      "seed_x": 933,
+      "autogen": true
+    },
+    "bsb10914821_01158.jpg": {
+      "seed_x": 1057,
+      "autogen": true
+    },
+    "bsb10914821_01159.jpg": {
+      "seed_x": 917,
+      "autogen": true
+    },
+    "bsb10914821_01160.jpg": {
+      "seed_x": 1150,
+      "autogen": false
+    },
+    "bsb10914821_01161.jpg": {
+      "seed_x": 1008,
+      "autogen": true
+    },
+    "bsb10914821_01162.jpg": {
+      "seed_x": 1071,
+      "autogen": true
+    },
+    "bsb10914821_01163.jpg": {
+      "seed_x": 923,
+      "autogen": true
+    },
+    "bsb10914821_01164.jpg": {
+      "seed_x": 1056,
+      "autogen": true
+    },
+    "bsb10914821_01165.jpg": {
+      "seed_x": 926,
+      "autogen": false
+    },
+    "bsb10914821_01166.jpg": {
+      "seed_x": 1106,
+      "autogen": true
+    },
+    "bsb10914821_01167.jpg": {
+      "seed_x": 935,
+      "autogen": true
+    },
+    "bsb10914821_01168.jpg": {
+      "seed_x": 1081,
+      "autogen": true
+    },
+    "bsb10914821_01169.jpg": {
+      "seed_x": 906,
+      "autogen": false
+    },
+    "bsb10914821_01170.jpg": {
+      "seed_x": 1062,
+      "autogen": true
+    },
+    "bsb10914821_01171.jpg": {
+      "seed_x": 941,
+      "autogen": true
+    },
+    "bsb10914821_01172.jpg": {
+      "seed_x": 1096,
+      "autogen": true
+    },
+    "bsb10914821_01173.jpg": {
+      "seed_x": 978,
+      "autogen": true
+    },
+    "bsb10914821_01174.jpg": {
+      "seed_x": 1088,
+      "autogen": true
+    },
+    "bsb10914821_01175.jpg": {
+      "seed_x": 947,
+      "autogen": true
+    },
+    "bsb10914821_01176.jpg": {
+      "seed_x": 1110,
+      "autogen": false
+    },
+    "bsb10914821_01177.jpg": {
+      "seed_x": 951,
+      "autogen": true
+    },
+    "bsb10914821_01178.jpg": {
+      "seed_x": 1075,
+      "autogen": true
+    },
+    "bsb10914821_01179.jpg": {
+      "seed_x": 945,
+      "autogen": true
+    },
+    "bsb10914821_01180.jpg": {
+      "seed_x": 1083,
+      "autogen": false
+    },
+    "bsb10914821_01181.jpg": {
+      "seed_x": 941,
+      "autogen": true
+    },
+    "bsb10914821_01182.jpg": {
+      "seed_x": 1078,
+      "autogen": true
+    },
+    "bsb10914821_01183.jpg": {
+      "seed_x": 925,
+      "autogen": true
+    },
+    "bsb10914821_01184.jpg": {
+      "seed_x": 1091,
+      "autogen": true
+    },
+    "bsb10914821_01185.jpg": {
+      "seed_x": 976,
+      "autogen": true
+    },
+    "bsb10914821_01186.jpg": {
+      "seed_x": 1067,
+      "autogen": true
+    },
+    "bsb10914821_01187.jpg": {
+      "seed_x": 949,
+      "autogen": true
+    },
+    "bsb10914821_01188.jpg": {
+      "seed_x": 1073,
+      "autogen": true
+    },
+    "bsb10914821_01189.jpg": {
+      "seed_x": 954,
+      "autogen": true
+    },
+    "bsb10914821_01190.jpg": {
+      "seed_x": 1078,
+      "autogen": true
+    },
+    "bsb10914821_01191.jpg": {
+      "seed_x": 965,
+      "autogen": true
+    },
+    "bsb10914821_01192.jpg": {
+      "seed_x": 1071,
+      "autogen": true
+    },
+    "bsb10914821_01193.jpg": {
+      "seed_x": 940,
+      "autogen": true
+    },
+    "bsb10914821_01194.jpg": {
+      "seed_x": 1034,
+      "autogen": true
+    },
+    "bsb10914821_01195.jpg": {
+      "seed_x": 980,
+      "autogen": true
+    },
+    "bsb10914821_01196.jpg": {
+      "seed_x": 1076,
+      "autogen": false
+    },
+    "bsb10914821_01197.jpg": {
+      "seed_x": 990,
+      "autogen": true
+    },
+    "bsb10914821_01198.jpg": {
+      "seed_x": 1088,
+      "autogen": true
+    },
+    "bsb10914821_01199.jpg": {
+      "seed_x": 1019,
+      "autogen": false
+    },
+    "bsb10914821_01200.jpg": {
+      "seed_x": 1096,
+      "autogen": true
+    },
+    "bsb10914821_01201.jpg": {
+      "seed_x": 965,
+      "autogen": true
+    },
+    "bsb10914821_01202.jpg": {
+      "seed_x": 1077,
+      "autogen": true
+    },
+    "bsb10914821_01203.jpg": {
+      "seed_x": 958,
+      "autogen": true
+    },
+    "bsb10914821_01204.jpg": {
+      "seed_x": 1100,
+      "autogen": false
+    },
+    "bsb10914821_01205.jpg": {
+      "seed_x": 971,
+      "autogen": true
+    },
+    "bsb10914821_01206.jpg": {
+      "seed_x": 1064,
+      "autogen": true
+    },
+    "bsb10914821_01207.jpg": {
+      "seed_x": 963,
+      "autogen": true
+    },
+    "bsb10914821_01208.jpg": {
+      "seed_x": 1108,
+      "autogen": true
+    },
+    "bsb10914821_01209.jpg": {
+      "seed_x": 949,
+      "autogen": true
+    },
+    "bsb10914821_01210.jpg": {
+      "seed_x": 1083,
+      "autogen": true
+    },
+    "bsb10914821_01211.jpg": {
+      "seed_x": 971,
+      "autogen": true
+    },
+    "bsb10914821_01212.jpg": {
+      "seed_x": 1065,
+      "autogen": true
+    },
+    "bsb10914821_01213.jpg": {
+      "seed_x": 938,
+      "autogen": true
+    },
+    "bsb10914821_01214.jpg": {
+      "seed_x": 1089,
+      "autogen": false
+    },
+    "bsb10914821_01215.jpg": {
+      "seed_x": 991,
+      "autogen": true
+    },
+    "bsb10914821_01216.jpg": {
+      "seed_x": 1053,
+      "autogen": true
+    },
+    "bsb10914821_01217.jpg": {
+      "seed_x": 993,
+      "autogen": true
+    },
+    "bsb10914821_01218.jpg": {
+      "seed_x": 1102,
+      "autogen": false
+    },
+    "bsb10914821_01219.jpg": {
+      "seed_x": 992,
+      "autogen": true
+    },
+    "bsb10914821_01220.jpg": {
+      "seed_x": 1077,
+      "autogen": false
+    },
+    "bsb10914821_01221.jpg": {
+      "seed_x": 982,
+      "autogen": false
+    },
+    "bsb10914821_01222.jpg": {
+      "seed_x": 1064,
+      "autogen": true
+    },
+    "bsb10914821_01223.jpg": {
+      "seed_x": 1019,
+      "autogen": true
+    },
+    "bsb10914821_01224.jpg": {
+      "seed_x": 1096,
+      "autogen": true
+    },
+    "bsb10914821_01225.jpg": {
+      "seed_x": 979,
+      "autogen": true
+    },
+    "bsb10914821_01226.jpg": {
+      "seed_x": 1077,
+      "autogen": true
+    },
+    "bsb10914821_01227.jpg": {
+      "seed_x": 929,
+      "autogen": true
+    },
+    "bsb10914821_01228.jpg": {
+      "seed_x": 1070,
+      "autogen": true
+    },
+    "bsb10914821_01229.jpg": {
+      "seed_x": 949,
+      "autogen": true
+    },
+    "bsb10914821_01230.jpg": {
+      "seed_x": 1080,
+      "autogen": false
+    },
+    "bsb10914821_01231.jpg": {
+      "seed_x": 951,
+      "autogen": true
+    },
+    "bsb10914821_01232.jpg": {
+      "seed_x": 1033,
+      "autogen": true
+    },
+    "bsb10914821_01233.jpg": {
+      "seed_x": 1009,
+      "autogen": true
+    },
+    "bsb10914821_01234.jpg": {
+      "seed_x": 1073,
+      "autogen": true
+    },
+    "bsb10914821_01235.jpg": {
+      "seed_x": 981,
+      "autogen": true
+    },
+    "bsb10914821_01236.jpg": {
+      "seed_x": 1041,
+      "autogen": true
+    },
+    "bsb10914821_01237.jpg": {
+      "seed_x": 982,
+      "autogen": true
+    },
+    "bsb10914821_01238.jpg": {
+      "seed_x": 1049,
+      "autogen": true
+    },
+    "bsb10914821_01239.jpg": {
+      "seed_x": 1007,
+      "autogen": true
+    },
+    "bsb10914821_01240.jpg": {
+      "seed_x": 1072,
+      "autogen": false
+    },
+    "bsb10914821_01241.jpg": {
+      "seed_x": 989,
+      "autogen": true
+    },
+    "bsb10914821_01242.jpg": {
+      "seed_x": 1055,
+      "autogen": true
+    },
+    "bsb10914821_01243.jpg": {
+      "seed_x": 987,
+      "autogen": true
+    },
+    "bsb10914821_01244.jpg": {
+      "seed_x": 1079,
+      "autogen": true
+    },
+    "bsb10914821_01245.jpg": {
+      "seed_x": 1000,
+      "autogen": true
+    },
+    "bsb10914821_01246.jpg": {
+      "seed_x": 1095,
+      "autogen": false
+    },
+    "bsb10914821_01247.jpg": {
+      "seed_x": 977,
+      "autogen": true
+    },
+    "bsb10914821_01248.jpg": {
+      "seed_x": 1112,
+      "autogen": false
+    },
+    "bsb10914821_01249.jpg": {
+      "seed_x": 1014,
+      "autogen": true
+    },
+    "bsb10914821_01250.jpg": {
+      "seed_x": 1064,
+      "autogen": true
+    },
+    "bsb10914821_01251.jpg": {
+      "seed_x": 1007,
+      "autogen": true
+    },
+    "bsb10914821_01252.jpg": {
+      "seed_x": 1090,
+      "autogen": false
+    },
+    "bsb10914821_01253.jpg": {
+      "seed_x": 962,
+      "autogen": true
+    },
+    "bsb10914821_01254.jpg": {
+      "seed_x": 1095,
+      "autogen": false
+    },
+    "bsb10914821_01255.jpg": {
+      "seed_x": 979,
+      "autogen": true
+    },
+    "bsb10914821_01256.jpg": {
+      "seed_x": 1074,
+      "autogen": true
+    },
+    "bsb10914821_01257.jpg": {
+      "seed_x": 993,
+      "autogen": true
+    },
+    "bsb10914821_01258.jpg": {
+      "seed_x": 1095,
+      "autogen": true
+    },
+    "bsb10914821_01259.jpg": {
+      "seed_x": 951,
+      "autogen": true
+    },
+    "bsb10914821_01260.jpg": {
+      "seed_x": 1093,
+      "autogen": false
+    },
+    "bsb10914821_01261.jpg": {
+      "seed_x": 942,
+      "autogen": true
+    },
+    "bsb10914821_01262.jpg": {
+      "seed_x": 1053,
+      "autogen": true
+    },
+    "bsb10914821_01263.jpg": {
+      "seed_x": 1021,
+      "autogen": true
+    },
+    "bsb10914821_01264.jpg": {
+      "seed_x": 1034,
+      "autogen": false
+    },
+    "bsb10914821_01265.jpg": {
+      "seed_x": 960,
+      "autogen": true
+    },
+    "bsb10914821_01266.jpg": {
+      "seed_x": 1058,
+      "autogen": true
+    },
+    "bsb10914821_01267.jpg": {
+      "seed_x": 999,
+      "autogen": true
+    },
+    "bsb10914821_01268.jpg": {
+      "seed_x": 1078,
+      "autogen": true
+    },
+    "bsb10914821_01269.jpg": {
+      "seed_x": 992,
+      "autogen": false
+    },
+    "bsb10914821_01270.jpg": {
+      "seed_x": 1073,
+      "autogen": false
+    },
+    "bsb10914821_01271.jpg": {
+      "seed_x": 975,
+      "autogen": true
+    },
+    "bsb10914821_01272.jpg": {
+      "seed_x": 1066,
+      "autogen": true
+    },
+    "bsb10914821_01273.jpg": {
+      "seed_x": 974,
+      "autogen": true
+    },
+    "bsb10914821_01274.jpg": {
+      "seed_x": 1047,
+      "autogen": true
+    },
+    "bsb10914821_01275.jpg": {
+      "seed_x": 975,
+      "autogen": true
+    },
+    "bsb10914821_01276.jpg": {
+      "seed_x": 1117,
+      "autogen": false
+    },
+    "bsb10914821_01277.jpg": {
+      "seed_x": 1009,
+      "autogen": true
+    },
+    "bsb10914821_01278.jpg": {
+      "seed_x": 1056,
+      "autogen": true
+    },
+    "bsb10914821_01279.jpg": {
+      "seed_x": 1023,
+      "autogen": true
+    },
+    "bsb10914821_01280.jpg": {
+      "seed_x": 1049,
+      "autogen": true
+    },
+    "bsb10914821_01281.jpg": {
+      "seed_x": 976,
+      "autogen": true
+    },
+    "bsb10914821_01282.jpg": {
+      "seed_x": 1051,
+      "autogen": true
+    },
+    "bsb10914821_01283.jpg": {
+      "seed_x": 1030,
+      "autogen": true
+    },
+    "bsb10914821_01284.jpg": {
+      "seed_x": 1072,
+      "autogen": true
+    },
+    "bsb10914821_01285.jpg": {
+      "seed_x": 988,
+      "autogen": true
+    },
+    "bsb10914821_01286.jpg": {
+      "seed_x": 1098,
+      "autogen": false
+    },
+    "bsb10914821_01287.jpg": {
+      "seed_x": 956,
+      "autogen": true
+    },
+    "bsb10914821_01288.jpg": {
+      "seed_x": 1068,
+      "autogen": true
+    }
+  }
+}
