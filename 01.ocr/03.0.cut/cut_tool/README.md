@@ -7,10 +7,11 @@ Cuts two-column scanned pages along their printed vertical divider, whitens the 
 | File | What it is |
 |---|---|
 | `line_detection.py` | Shared algorithm (seed search, trace, JSON I/O). Imported by both the notebook and the GUI. |
-| `split_on_vertical_line.ipynb` | Jupyter notebook for batch processing. |
+| `00.split_on_vertical_line.ipynb` | Jupyter notebook for batch processing. |
 | `correction_tool.py` | Tkinter GUI for manually correcting individual pages. |
-
-All three must live in the same folder (the GUI and notebook both `import line_detection`).
+| `import_svg_overlays.py` | SVG (From inkscape edits) import to overlays.json. |
+| `export_svg_overlays.py` | Json + images to svgs Ctrl+Shift+L, nav to edit this, f2 |
+All five must live in the same folder (the GUI and notebook both `import line_detection`).
 
 ## Quick start
 
