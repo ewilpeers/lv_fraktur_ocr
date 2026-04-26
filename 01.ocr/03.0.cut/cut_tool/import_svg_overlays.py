@@ -99,96 +99,112 @@ def _rasterize_bezier(
 # SVG path 'd' string parser (handles M, m, L, l, C, c, Z, z)
 # ---------------------------------------------------------------------------
 def parse_svg_path_d(d_string: str, image_height: int) -> np.ndarray:
-    """Parse an SVG path 'd' attribute into an xs array.
+    """Parse SVG path 'd' attribute — handles all common commands.
     
-    Handles explicit commands: M, m, L, l, C, c, Z, z
-    Also handles implicit lineto after moveto (SVG spec rule).
+    Supports: M, m, L, l, H, h, V, v, C, c, Z, z
+    Also handles implicit lineto after moveto (SVG spec).
     """
     xs = np.full(image_height, -1, dtype=np.int32)
     d_string = d_string.strip()
     
-    # Tokenize: command letters and numbers
-    tokens = re.findall(r'[MLCZmlcz]|[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?', d_string)
+    # Tokenize: command letters (all standard ones) and numbers
+    tokens = re.findall(
+        r'[MLHVCSQTAZmlhvcsqtaz]|[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?', d_string
+    )
     
     cur_x, cur_y = 0.0, 0.0
     start_x, start_y = 0.0, 0.0
-    i = 0
-    
-    # Track the last command type for implicit repetition
     last_cmd = None
+    i = 0
     
     while i < len(tokens):
         tok = tokens[i]
         
-        # If tok is a command letter, use it. Otherwise, it's an implicit
-        # repetition of the previous command (check for implicit L/l after M/m).
-        if tok in ('M', 'm', 'L', 'l', 'C', 'c', 'Z', 'z'):
+        # Check if token is a command letter
+        if tok in 'MLHVCSQTAZmlhvcsqtaz':
             cmd = tok
             i += 1
             last_cmd = cmd
         else:
-            # Implicit command: numbers without a preceding letter.
-            # According to SVG spec:
-            #   - After M/m, extra pairs become L/l (same case as the M/m).
-            #   - After L/l, extra pairs repeat the same L/l.
-            #   - After C/c, extra sextuplets repeat the same C/c.
+            # Implicit command repetition
             if last_cmd in ('M', 'm'):
                 cmd = 'L' if last_cmd == 'M' else 'l'
-            elif last_cmd in ('L', 'l', 'C', 'c'):
+            elif last_cmd in ('L', 'l', 'H', 'h', 'V', 'v', 'C', 'c'):
                 cmd = last_cmd
             else:
-                # Unknown — skip this number and move on
+                # Unknown context: skip this number and try to recover
                 i += 1
                 continue
-            # Don't increment i; we'll read the numbers below
+            # Don't increment i; we'll read the numbers with the current cmd
         
-        # --- Absolute moveto ---
+        # --- Moveto ---
         if cmd == 'M':
-            cur_x = float(tokens[i]); cur_y = float(tokens[i + 1]); i += 2
+            cur_x = float(tokens[i]); cur_y = float(tokens[i+1]); i += 2
             start_x, start_y = cur_x, cur_y
             _record_point(xs, cur_x, cur_y)
-            
-        # --- Relative moveto ---
         elif cmd == 'm':
-            cur_x += float(tokens[i]); cur_y += float(tokens[i + 1]); i += 2
+            cur_x += float(tokens[i]); cur_y += float(tokens[i+1]); i += 2
             start_x, start_y = cur_x, cur_y
             _record_point(xs, cur_x, cur_y)
-            
-        # --- Absolute lineto ---
+        
+        # --- Lineto (absolute) ---
         elif cmd == 'L':
-            while i < len(tokens) and not (tokens[i] in ('M','m','L','l','C','c','Z','z')):
-                x = float(tokens[i]); y = float(tokens[i + 1]); i += 2
+            while i < len(tokens) and not is_cmd(tokens[i]):
+                x = float(tokens[i]); y = float(tokens[i+1]); i += 2
                 _rasterize_line(xs, cur_x, cur_y, x, y)
                 cur_x, cur_y = x, y
-                
-        # --- Relative lineto ---
         elif cmd == 'l':
-            while i < len(tokens) and not (tokens[i] in ('M','m','L','l','C','c','Z','z')):
-                dx = float(tokens[i]); dy = float(tokens[i + 1]); i += 2
+            while i < len(tokens) and not is_cmd(tokens[i]):
+                dx = float(tokens[i]); dy = float(tokens[i+1]); i += 2
                 x = cur_x + dx; y = cur_y + dy
                 _rasterize_line(xs, cur_x, cur_y, x, y)
                 cur_x, cur_y = x, y
-                
-        # --- Absolute cubic bezier ---
+        
+        # --- Horizontal lineto ---
+        elif cmd == 'H':
+            while i < len(tokens) and not is_cmd(tokens[i]):
+                x = float(tokens[i]); i += 1
+                _rasterize_line(xs, cur_x, cur_y, x, cur_y)
+                cur_x = x
+        elif cmd == 'h':
+            while i < len(tokens) and not is_cmd(tokens[i]):
+                cur_x += float(tokens[i]); i += 1
+                _rasterize_line(xs, cur_x - float(tokens[i-1]), cur_y, cur_x, cur_y)
+                # Actually easier: record line from before to after
+                # We'll adjust: simplified:
+                x_before = cur_x - float(tokens[i-1])
+                _rasterize_line(xs, x_before, cur_y, cur_x, cur_y)
+        
+        # --- Vertical lineto ---
+        elif cmd == 'V':
+            while i < len(tokens) and not is_cmd(tokens[i]):
+                y = float(tokens[i]); i += 1
+                _rasterize_line(xs, cur_x, cur_y, cur_x, y)
+                cur_y = y
+        elif cmd == 'v':
+            while i < len(tokens) and not is_cmd(tokens[i]):
+                cur_y += float(tokens[i]); i += 1
+                y_before = cur_y - float(tokens[i-1])
+                _rasterize_line(xs, cur_x, y_before, cur_x, cur_y)
+        
+        # --- Cubic bezier (absolute) ---
         elif cmd == 'C':
-            while i + 5 < len(tokens) and not (tokens[i] in ('M','m','L','l','C','c','Z','z')):
-                cp1x = float(tokens[i]);   cp1y = float(tokens[i + 1])
-                cp2x = float(tokens[i + 2]); cp2y = float(tokens[i + 3])
-                x    = float(tokens[i + 4]); y    = float(tokens[i + 5])
+            while i + 5 < len(tokens) and not is_cmd(tokens[i]):
+                cp1x = float(tokens[i]);   cp1y = float(tokens[i+1])
+                cp2x = float(tokens[i+2]); cp2y = float(tokens[i+3])
+                x    = float(tokens[i+4]); y    = float(tokens[i+5])
                 i += 6
                 _rasterize_bezier(xs, cur_x, cur_y, cp1x, cp1y, cp2x, cp2y, x, y)
                 cur_x, cur_y = x, y
-                
-        # --- Relative cubic bezier ---
         elif cmd == 'c':
-            while i + 5 < len(tokens) and not (tokens[i] in ('M','m','L','l','C','c','Z','z')):
-                cp1x = cur_x + float(tokens[i]);   cp1y = cur_y + float(tokens[i + 1])
-                cp2x = cur_x + float(tokens[i + 2]); cp2y = cur_y + float(tokens[i + 3])
-                x    = cur_x + float(tokens[i + 4]); y    = cur_y + float(tokens[i + 5])
+            while i + 5 < len(tokens) and not is_cmd(tokens[i]):
+                cp1x = cur_x + float(tokens[i]);   cp1y = cur_y + float(tokens[i+1])
+                cp2x = cur_x + float(tokens[i+2]); cp2y = cur_y + float(tokens[i+3])
+                x    = cur_x + float(tokens[i+4]); y    = cur_y + float(tokens[i+5])
                 i += 6
                 _rasterize_bezier(xs, cur_x, cur_y, cp1x, cp1y, cp2x, cp2y, x, y)
                 cur_x, cur_y = x, y
-                
+        
         # --- Close path ---
         elif cmd in ('Z', 'z'):
             _rasterize_line(xs, cur_x, cur_y, start_x, start_y)
@@ -196,6 +212,10 @@ def parse_svg_path_d(d_string: str, image_height: int) -> np.ndarray:
     
     return xs
 
+
+def is_cmd(token: str) -> bool:
+    """Return True if token is an SVG command letter."""
+    return token in 'MLHVCSQTAZmlhvcsqtaz'
 
 # ---------------------------------------------------------------------------
 # SVG content parsers — extract line from full SVG file
