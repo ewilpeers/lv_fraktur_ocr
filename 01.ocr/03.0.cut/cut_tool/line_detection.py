@@ -51,6 +51,33 @@ DEFAULT_CONFIG: Dict = {
     'multipass_min_seg_len': 8,
     'multipass_line_tolerance': 1,
     'multipass_context_window': 50,
+    # Isolation-skeleton + polyfit (the primary line-finder for printed
+    # dividers). Build a binary mask where each pixel survives only if its
+    # column has many vertical neighbours within `iso_vk_rows` AND the
+    # flanking columns at +/- `iso_flank_offset` px each have at most
+    # `iso_flank_max` such neighbours -- i.e., the divider is dark surrounded
+    # by light gutter, while text columns (which have many dark neighbours
+    # left and right) get rejected. The strict params produce few but very
+    # confident anchor pixels; if they're too sparse, we fall back to medium
+    # params, then to the dual-window trace.
+    'iso_vk_rows': 20,             # half-height of the column-density window
+    'iso_inner_min': 35,           # min dark count in column window for survival
+    'iso_flank_offset': 6,         # px to flanking columns
+    'iso_flank_max': 6,            # max dark count allowed in either flank
+    'iso_strict_min': 200,         # need this many anchors before trying medium
+    'iso_min_anchors': 100,        # below this -> total fallback to dual-window
+    'iso_inlier_band': 3,          # px band around modal x for initial inliers
+    'iso_residual_threshold': 2.5, # max polyfit residual (px) to keep an inlier
+    'iso_extrap_threshold': 1.5,   # mean residual <= this -> extrapolate to full page
+    'iso_min_span_frac': 0.30,     # inliers must span at least this fraction of page
+    # Threshold sweep: try these dark_thresholds for mask construction (the
+    # one giving the highest mode count wins). Lets us handle pages whose
+    # dividers are darker than the global default.
+    'iso_threshold_sweep': (110, 125, 140),
+    # Medium-mask fallback parameters (looser than strict).
+    'iso_medium_vk_rows': 10,
+    'iso_medium_inner_min': 15,
+    'iso_medium_flank_max': 8,
 }
 
 
@@ -342,22 +369,221 @@ def refine_multipass(img_rgb: np.ndarray, xs: np.ndarray,
 
 def trace_from_seed_refined(img_rgb: np.ndarray, seed_x: int, cfg: Dict
                             ) -> Tuple[np.ndarray, Tuple[int, int]]:
-    """Convenience: trace_from_seed + refine_multipass."""
+    """Single-call trace API used by the GUI for manual re-trace.
+
+    Tries iso-polyfit first (which is the primary line finder). Iso-polyfit
+    has its own internal fallback to dual-window+multipass when anchors are
+    too sparse, so this function is end-to-end robust."""
+    xs, (y0, y1), _src, _info = trace_iso_polyfit(img_rgb, seed_x, cfg)
+    return xs, (y0, y1)
+
+
+# ---------------------------------------------------------------------------
+# Isolation-skeleton mask + polynomial line fit
+# ---------------------------------------------------------------------------
+def build_isolation_mask(dark: np.ndarray, vk_rows: int, inner_min: int,
+                          flank_offset: int, flank_max: int) -> np.ndarray:
+    """A pixel survives if its column has at least `inner_min` dark pixels in
+    the window y +/- vk_rows AND the flanking columns at +/- flank_offset px
+    each have at most `flank_max` such dark pixels.
+
+    The first condition keeps tall vertical structures (the divider, but
+    also tall letter strokes). The flank conditions reject tall structures
+    that have other tall dark structures immediately adjacent (text columns,
+    where letter strokes cluster horizontally).
+
+    Net effect: keeps ISOLATED tall vertical structures, which is exactly
+    what a printed/inked divider looks like in a two-column scan.
+    """
+    H, W = dark.shape
+    cs = np.cumsum(dark.astype(np.int32), axis=0)
+    vert_count = np.zeros_like(dark, dtype=np.int32)
+    for y in range(H):
+        y0_ = max(0, y - vk_rows)
+        y1_ = min(H - 1, y + vk_rows)
+        vert_count[y] = cs[y1_] - (cs[y0_ - 1] if y0_ > 0 else 0)
+
+    flank_left = np.zeros_like(vert_count)
+    flank_right = np.zeros_like(vert_count)
+    if flank_offset < W:
+        flank_left[:, flank_offset:] = vert_count[:, :W - flank_offset]
+        flank_right[:, :W - flank_offset] = vert_count[:, flank_offset:]
+
+    inner_ok = vert_count >= inner_min
+    flank_ok = (flank_left <= flank_max) & (flank_right <= flank_max)
+    return dark & inner_ok & flank_ok
+
+
+def _gather_iso_anchors(chan: np.ndarray, seed_x: int, max_drift: int,
+                         vk: int, inner: int, off: int, flmax: int,
+                         thresholds: Tuple[int, ...]
+                         ) -> Tuple[Optional[np.ndarray], Optional[np.ndarray], Optional[int]]:
+    """Try each threshold in `thresholds`; for each build the isolation mask
+    and collect anchors (the dark pixel closest to seed_x within +/- max_drift
+    on each row). Return the anchor set whose modal x had the highest count
+    (strongest single-x signal). Returns (ys, xs, threshold) or (None, None, None)
+    if no threshold produced any anchors.
+    """
+    H, W = chan.shape
+    lo, hi = max(0, seed_x - max_drift), min(W, seed_x + max_drift + 1)
+    best_y: Optional[np.ndarray] = None
+    best_x: Optional[np.ndarray] = None
+    best_mode_count = -1
+    best_thr: Optional[int] = None
+    for thr in thresholds:
+        dark = chan <= thr
+        mask = build_isolation_mask(dark, vk, inner, off, flmax)
+        anchors_y: List[int] = []
+        anchors_x: List[int] = []
+        for y in range(H):
+            row = mask[y, lo:hi]
+            if row.any():
+                xs_b = np.where(row)[0] + lo
+                anchors_y.append(y)
+                anchors_x.append(int(xs_b[np.argmin(np.abs(xs_b - seed_x))]))
+        if not anchors_y:
+            continue
+        ax = np.array(anchors_x, dtype=np.int32)
+        _, counts = np.unique(ax, return_counts=True)
+        mode_count = int(counts.max())
+        if mode_count > best_mode_count:
+            best_mode_count = mode_count
+            best_y = np.array(anchors_y, dtype=np.int32)
+            best_x = ax
+            best_thr = thr
+    return best_y, best_x, best_thr
+
+
+def _trace_dual_then_refine(img_rgb: np.ndarray, seed_x: int, cfg: Dict
+                             ) -> Tuple[np.ndarray, Tuple[int, int]]:
+    """Internal: dual-window trace + multipass refinement, with no iso path.
+    Used as a hard fallback inside `trace_iso_polyfit` to avoid infinite
+    recursion via `trace_from_seed_refined`."""
     xs, (y0, y1) = trace_from_seed(img_rgb, seed_x, cfg)
-    if cfg.get('multipass_passes', 4) > 0:
+    if cfg.get('multipass_passes', 4) > 0 and y1 >= y0:
         xs, (y0, y1), _ = refine_multipass(img_rgb, xs, y0, y1, cfg)
     return xs, (y0, y1)
+
+
+def trace_iso_polyfit(img_rgb: np.ndarray, seed_x: int, cfg: Dict
+                       ) -> Tuple[np.ndarray, Tuple[int, int], str, str]:
+    """Strict-mask -> medium-mask cascade -> RANSAC-style polyfit (deg 1 or 2)
+    -> extrapolate (or bound to anchor span if fit is loose).
+
+    Returns (xs, (y0, y1), source_label, info_str). source_label is one of:
+      'iso-polyfit-strict', 'iso-polyfit-medium', 'iso-fallback'.
+    """
+    chan = to_single_channel(img_rgb, cfg.get('gray_mode', 'gray'))
+    H, W = chan.shape
+    max_drift = cfg.get('max_drift_from_seed', 15)
+    thresholds = cfg.get('iso_threshold_sweep', (110, 125, 140))
+
+    # Strict mask
+    y_s, x_s, thr_s = _gather_iso_anchors(
+        chan, seed_x, max_drift,
+        cfg.get('iso_vk_rows', 20),
+        cfg.get('iso_inner_min', 35),
+        cfg.get('iso_flank_offset', 6),
+        cfg.get('iso_flank_max', 6),
+        thresholds,
+    )
+    if y_s is not None and len(y_s) >= cfg.get('iso_strict_min', 200):
+        ys, xs_a = y_s.astype(np.float64), x_s.astype(np.float64)
+        chosen_thr = thr_s
+        mask_label = 'strict'
+    else:
+        # Medium fallback
+        y_m, x_m, thr_m = _gather_iso_anchors(
+            chan, seed_x, max_drift,
+            cfg.get('iso_medium_vk_rows', 10),
+            cfg.get('iso_medium_inner_min', 15),
+            cfg.get('iso_flank_offset', 6),
+            cfg.get('iso_medium_flank_max', 8),
+            thresholds,
+        )
+        if y_m is None or len(y_m) < cfg.get('iso_min_anchors', 100):
+            xs_, (y0_, y1_) = _trace_dual_then_refine(img_rgb, seed_x, cfg)
+            return xs_, (y0_, y1_), 'iso-fallback', 'too few anchors'
+        ys, xs_a = y_m.astype(np.float64), x_m.astype(np.float64)
+        chosen_thr = thr_m
+        mask_label = 'medium'
+
+    # Inliers within band of mode
+    unique, counts = np.unique(xs_a.astype(np.int32), return_counts=True)
+    dom_x = int(unique[np.argmax(counts)])
+    inliers = np.abs(xs_a - dom_x) <= cfg.get('iso_inlier_band', 3)
+    if inliers.sum() < 30:
+        inliers = np.abs(xs_a - dom_x) <= 6
+    iy = ys[inliers]
+    ix = xs_a[inliers]
+
+    # Span check
+    if len(iy) == 0 or (iy[-1] - iy[0] + 1) / H < cfg.get('iso_min_span_frac', 0.30):
+        xs_, (y0_, y1_) = _trace_dual_then_refine(img_rgb, seed_x, cfg)
+        return xs_, (y0_, y1_), 'iso-fallback', 'inlier span too small'
+
+    # Polyfit deg 1 vs 2 with iterative outlier rejection
+    res_thresh = cfg.get('iso_residual_threshold', 2.5)
+    best: Optional[Tuple[float, np.ndarray, int, float, int]] = None
+    for deg in (1, 2):
+        cur_y, cur_x = iy.copy(), ix.copy()
+        for _ in range(3):
+            if len(cur_y) < deg + 1:
+                break
+            cf = np.polyfit(cur_y, cur_x, deg)
+            res = np.abs(cur_x - np.polyval(cf, cur_y))
+            keep = res <= res_thresh
+            if keep.sum() < deg + 1 or keep.sum() == len(cur_y):
+                break
+            cur_y, cur_x = cur_y[keep], cur_x[keep]
+        if len(cur_y) < deg + 1:
+            continue
+        cf = np.polyfit(cur_y, cur_x, deg)
+        mres = float(np.mean(np.abs(cur_x - np.polyval(cf, cur_y))))
+        # Penalise degree 2 slightly so we prefer simple straight fits when
+        # the residual is comparable.
+        score = mres + (0.10 if deg == 2 else 0.0)
+        if best is None or score < best[0]:
+            best = (score, cf, deg, mres, len(cur_y))
+    if best is None:
+        xs_, (y0_, y1_) = _trace_dual_then_refine(img_rgb, seed_x, cfg)
+        return xs_, (y0_, y1_), 'iso-fallback', 'polyfit failed'
+
+    _, coeffs, deg, residual, n_inliers = best
+
+    # Extrapolate to full page if fit is tight, else bound to anchor span
+    full_xs = np.full(H, -1, dtype=np.int32)
+    extrap_thresh = cfg.get('iso_extrap_threshold', 1.5)
+    if residual < extrap_thresh:
+        y0, y1 = 0, H - 1
+    else:
+        y0 = max(0, int(iy.min()) - 50)
+        y1 = min(H - 1, int(iy.max()) + 50)
+    for y in range(y0, y1 + 1):
+        x_pred = int(round(np.polyval(coeffs, y)))
+        if abs(x_pred - seed_x) > max_drift:
+            continue
+        full_xs[y] = x_pred
+
+    info = f'{mask_label} deg={deg} resid={residual:.2f} n={n_inliers} thr={chosen_thr}'
+    return full_xs, (y0, y1), f'iso-polyfit-{mask_label}', info
 
 
 def find_vertical_line(img_rgb: np.ndarray, cfg: Optional[Dict] = None,
                        seed_x_override: Optional[int] = None
                        ) -> Tuple[np.ndarray, Tuple[int, int], int]:
-    """Top-level convenience. Auto-seeds unless seed_x_override is given.
-    Includes multi-pass refinement when `cfg['multipass_passes'] > 0`."""
+    """Top-level convenience. Auto-seeds unless `seed_x_override` is given.
+
+    Uses isolation-skeleton + polynomial fit by default. Falls back to the
+    dual-window trace + multipass refinement when the iso approach can't
+    establish enough anchors (e.g., pages with no printed divider, just a
+    column gap).
+    """
     if cfg is None:
         cfg = DEFAULT_CONFIG
-    seed_x = int(seed_x_override) if seed_x_override is not None else find_seed_x(img_rgb, cfg)
-    xs, (y0, y1) = trace_from_seed_refined(img_rgb, seed_x, cfg)
+    seed_x = (int(seed_x_override) if seed_x_override is not None
+              else find_seed_x(img_rgb, cfg))
+    xs, (y0, y1), _src, _info = trace_iso_polyfit(img_rgb, seed_x, cfg)
     return xs, (y0, y1), seed_x
 
 
