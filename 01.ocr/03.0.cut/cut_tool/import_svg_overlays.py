@@ -1,4 +1,4 @@
-# import_svg_overlays.py
+# import_svg_overlays.py — COMPLETE FIXED VERSION
 """Import edited SVG overlays and update overlays.json with corrected lines.
 
 Usage:
@@ -10,11 +10,10 @@ re-run the notebook to apply the corrections.
 """
 from __future__ import annotations
 
-import json
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional
 
 import numpy as np
 from PIL import Image
@@ -25,105 +24,12 @@ from line_detection import (
     xs_to_serializable,
 )
 
-from correction_tool import (
-    OVERLAYS_FILENAME
-)
-
-# XML namespace handling
-SVG_NS = 'http://www.w3.org/2000/svg'
+OVERLAYS_FILENAME = 'overlays.json'
 
 
-def parse_svg_path_d(d_string: str, image_height: int) -> np.ndarray:
-    """Parse an SVG path 'd' attribute and rasterize it to pixel columns per row.
-    
-    Handles M (moveto), L (lineto), C (cubic bezier) commands.
-    Returns xs array where xs[y] = x coordinate or -1 if no line at that row.
-    
-    For bezier curves, samples at sub-pixel resolution to ensure smooth
-    interpolation.
-    """
-    xs = np.full(image_height, -1, dtype=np.int32)
-    
-    # Normalize the path string: remove extra whitespace, split commands
-    d_string = d_string.strip()
-    
-    # Tokenize: split on command letters, keeping the letters
-    tokens = re.findall(r'[MLCZmlcz]|[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?', d_string)
-    
-    current_x = 0.0
-    current_y = 0.0
-    start_x = 0.0
-    start_y = 0.0
-    
-    i = 0
-    while i < len(tokens):
-        cmd = tokens[i]
-        i += 1
-        
-        if cmd == 'M':
-            # Absolute moveto
-            x = float(tokens[i]); y = float(tokens[i + 1])
-            i += 2
-            current_x, current_y = x, y
-            start_x, start_y = x, y
-            _record_point(xs, x, y)
-            
-        elif cmd == 'm':
-            # Relative moveto
-            x = float(tokens[i]); y = float(tokens[i + 1])
-            i += 2
-            current_x += x; current_y += y
-            start_x, start_y = current_x, current_y
-            _record_point(xs, current_x, current_y)
-            
-        elif cmd == 'L':
-            # Absolute lineto
-            while i < len(tokens) and not tokens[i].isalpha():
-                x = float(tokens[i]); y = float(tokens[i + 1])
-                i += 2
-                _rasterize_line(xs, current_x, current_y, x, y)
-                current_x, current_y = x, y
-                
-        elif cmd == 'l':
-            # Relative lineto
-            while i < len(tokens) and not tokens[i].isalpha():
-                dx = float(tokens[i]); dy = float(tokens[i + 1])
-                i += 2
-                x = current_x + dx; y = current_y + dy
-                _rasterize_line(xs, current_x, current_y, x, y)
-                current_x, current_y = x, y
-                
-        elif cmd == 'C':
-            # Absolute cubic bezier
-            while i < len(tokens) and not tokens[i].isalpha():
-                cp1x = float(tokens[i]); cp1y = float(tokens[i + 1])
-                cp2x = float(tokens[i + 2]); cp2y = float(tokens[i + 3])
-                x = float(tokens[i + 4]); y = float(tokens[i + 5])
-                i += 6
-                _rasterize_bezier(xs, current_x, current_y, cp1x, cp1y, cp2x, cp2y, x, y)
-                current_x, current_y = x, y
-                
-        elif cmd == 'c':
-            # Relative cubic bezier
-            while i < len(tokens) and not tokens[i].isalpha():
-                cp1x = current_x + float(tokens[i])
-                cp1y = current_y + float(tokens[i + 1])
-                cp2x = current_x + float(tokens[i + 2])
-                cp2y = current_y + float(tokens[i + 3])
-                x = current_x + float(tokens[i + 4])
-                y = current_y + float(tokens[i + 5])
-                i += 6
-                _rasterize_bezier(xs, current_x, current_y, cp1x, cp1y, cp2x, cp2y, x, y)
-                current_x, current_y = x, y
-                
-        elif cmd in ('Z', 'z'):
-            # Close path: line back to start
-            _rasterize_line(xs, current_x, current_y, start_x, start_y)
-            current_x, current_y = start_x, start_y
-    
-    return xs
-
-
+# ---------------------------------------------------------------------------
+# Path drawing helpers
+# ---------------------------------------------------------------------------
 def _record_point(xs: np.ndarray, x: float, y: float) -> None:
     """Record a single point in the xs array."""
     row = int(round(y))
@@ -132,15 +38,12 @@ def _record_point(xs: np.ndarray, x: float, y: float) -> None:
 
 
 def _rasterize_line(xs: np.ndarray, x1: float, y1: float, x2: float, y2: float) -> None:
-    """Rasterize a line segment into the xs array."""
+    """Rasterize a line segment, filling every row between y1 and y2."""
     dy = abs(y2 - y1)
     if dy < 0.5:
-        # Nearly horizontal: just record endpoints
         _record_point(xs, x1, y1)
         _record_point(xs, x2, y2)
         return
-    
-    # Sample at every row
     steps = max(int(dy), 1)
     for t in range(steps + 1):
         frac = t / steps
@@ -156,25 +59,19 @@ def _rasterize_bezier(
     cp2x: float, cp2y: float,
     x3: float, y3: float,
 ) -> None:
-    """Rasterize a cubic bezier curve into the xs array.
-    
-    Samples densely enough to capture every row the curve passes through.
-    """
-    # Estimate arc length for sampling
+    """Rasterize a cubic bezier curve, filling every row."""
     dy = abs(y3 - y0)
     if dy < 0.5:
         _record_point(xs, x0, y0)
         _record_point(xs, x3, y3)
         return
     
-    # Adaptive sampling: more points for longer curves
     samples = max(int(dy * 3), 30)
-    
     prev_y = int(round(y0))
+    prev_x = x0
     _record_point(xs, x0, y0)
     
     for t in np.linspace(0, 1, samples):
-        # Cubic bezier formula
         t2 = t * t
         t3 = t2 * t
         mt = 1 - t
@@ -185,69 +82,178 @@ def _rasterize_bezier(
         y = mt3 * y0 + 3 * mt2 * t * cp1y + 3 * mt * t2 * cp2y + t3 * y3
         
         curr_y = int(round(y))
-        # If we skipped rows, interpolate them
+        # Fill any skipped rows
         if abs(curr_y - prev_y) > 1:
             step = 1 if curr_y > prev_y else -1
             for interp_y in range(prev_y + step, curr_y, step):
                 frac = (interp_y - prev_y) / (curr_y - prev_y) if curr_y != prev_y else 0
-                interp_x = x0 + (x - x0) * frac  # Approximate
+                interp_x = prev_x + (x - prev_x) * frac
                 _record_point(xs, interp_x, interp_y)
         
         _record_point(xs, x, y)
         prev_y = curr_y
-        x0, y0 = x, y  # Update for interpolation tracking
+        prev_x = x
 
 
-def extract_path_from_svg(svg_path: Path) -> Optional[Tuple[str, float, float]]:
-    """Extract the split line path from an edited SVG.
+# ---------------------------------------------------------------------------
+# SVG path 'd' string parser (handles M, m, L, l, C, c, Z, z)
+# ---------------------------------------------------------------------------
+def parse_svg_path_d(d_string: str, image_height: int) -> np.ndarray:
+    """Parse an SVG path 'd' attribute into an xs array.
     
-    Returns (path_d_string, y_start, y_end) or None if no valid path found.
-    Looks for the path with id='split-line'.
+    Handles explicit commands: M, m, L, l, C, c, Z, z
+    Also handles implicit lineto after moveto (SVG spec rule).
     """
-    try:
-        content = svg_path.read_text(encoding='utf-8')
-    except Exception as e:
-        print(f'  ERROR reading {svg_path.name}: {e}')
-        return None
+    xs = np.full(image_height, -1, dtype=np.int32)
+    d_string = d_string.strip()
     
-    # Try to find path with id="split-line"
-    # Pattern: <path ... id="split-line" ... d="..." ... />
-    pattern = r'<path[^>]*\bid\s*=\s*["\']split-line["\'][^>]*\bd\s*=\s*["\']([^"\']+)["\']'
-    match = re.search(pattern, content, re.IGNORECASE | re.DOTALL)
+    # Tokenize: command letters and numbers
+    tokens = re.findall(r'[MLCZmlcz]|[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?', d_string)
     
-    if not match:
-        # Try finding any path with 'split' in the id
-        pattern = r'<path[^>]*\bid\s*=\s*["\'][^"\']*split[^"\']*["\'][^>]*\bd\s*=\s*["\']([^"\']+)["\']'
-        match = re.search(pattern, content, re.IGNORECASE | re.DOTALL)
+    cur_x, cur_y = 0.0, 0.0
+    start_x, start_y = 0.0, 0.0
+    i = 0
     
-    if not match:
-        # Last resort: first path element
-        pattern = r'<path[^>]*\bd\s*=\s*["\']([^"\']+)["\']'
-        match = re.search(pattern, content, re.IGNORECASE | re.DOTALL)
+    # Track the last command type for implicit repetition
+    last_cmd = None
     
-    if not match:
-        print(f'  WARNING: No path found in {svg_path.name}')
-        return None
+    while i < len(tokens):
+        tok = tokens[i]
+        
+        # If tok is a command letter, use it. Otherwise, it's an implicit
+        # repetition of the previous command (check for implicit L/l after M/m).
+        if tok in ('M', 'm', 'L', 'l', 'C', 'c', 'Z', 'z'):
+            cmd = tok
+            i += 1
+            last_cmd = cmd
+        else:
+            # Implicit command: numbers without a preceding letter.
+            # According to SVG spec:
+            #   - After M/m, extra pairs become L/l (same case as the M/m).
+            #   - After L/l, extra pairs repeat the same L/l.
+            #   - After C/c, extra sextuplets repeat the same C/c.
+            if last_cmd in ('M', 'm'):
+                cmd = 'L' if last_cmd == 'M' else 'l'
+            elif last_cmd in ('L', 'l', 'C', 'c'):
+                cmd = last_cmd
+            else:
+                # Unknown — skip this number and move on
+                i += 1
+                continue
+            # Don't increment i; we'll read the numbers below
+        
+        # --- Absolute moveto ---
+        if cmd == 'M':
+            cur_x = float(tokens[i]); cur_y = float(tokens[i + 1]); i += 2
+            start_x, start_y = cur_x, cur_y
+            _record_point(xs, cur_x, cur_y)
+            
+        # --- Relative moveto ---
+        elif cmd == 'm':
+            cur_x += float(tokens[i]); cur_y += float(tokens[i + 1]); i += 2
+            start_x, start_y = cur_x, cur_y
+            _record_point(xs, cur_x, cur_y)
+            
+        # --- Absolute lineto ---
+        elif cmd == 'L':
+            while i < len(tokens) and not (tokens[i] in ('M','m','L','l','C','c','Z','z')):
+                x = float(tokens[i]); y = float(tokens[i + 1]); i += 2
+                _rasterize_line(xs, cur_x, cur_y, x, y)
+                cur_x, cur_y = x, y
+                
+        # --- Relative lineto ---
+        elif cmd == 'l':
+            while i < len(tokens) and not (tokens[i] in ('M','m','L','l','C','c','Z','z')):
+                dx = float(tokens[i]); dy = float(tokens[i + 1]); i += 2
+                x = cur_x + dx; y = cur_y + dy
+                _rasterize_line(xs, cur_x, cur_y, x, y)
+                cur_x, cur_y = x, y
+                
+        # --- Absolute cubic bezier ---
+        elif cmd == 'C':
+            while i + 5 < len(tokens) and not (tokens[i] in ('M','m','L','l','C','c','Z','z')):
+                cp1x = float(tokens[i]);   cp1y = float(tokens[i + 1])
+                cp2x = float(tokens[i + 2]); cp2y = float(tokens[i + 3])
+                x    = float(tokens[i + 4]); y    = float(tokens[i + 5])
+                i += 6
+                _rasterize_bezier(xs, cur_x, cur_y, cp1x, cp1y, cp2x, cp2y, x, y)
+                cur_x, cur_y = x, y
+                
+        # --- Relative cubic bezier ---
+        elif cmd == 'c':
+            while i + 5 < len(tokens) and not (tokens[i] in ('M','m','L','l','C','c','Z','z')):
+                cp1x = cur_x + float(tokens[i]);   cp1y = cur_y + float(tokens[i + 1])
+                cp2x = cur_x + float(tokens[i + 2]); cp2y = cur_y + float(tokens[i + 3])
+                x    = cur_x + float(tokens[i + 4]); y    = cur_y + float(tokens[i + 5])
+                i += 6
+                _rasterize_bezier(xs, cur_x, cur_y, cp1x, cp1y, cp2x, cp2y, x, y)
+                cur_x, cur_y = x, y
+                
+        # --- Close path ---
+        elif cmd in ('Z', 'z'):
+            _rasterize_line(xs, cur_x, cur_y, start_x, start_y)
+            cur_x, cur_y = start_x, start_y
     
-    path_d = match.group(1)
-    
-    # Extract coordinates to find y range
-    coords = re.findall(r'[-+]?\d*\.?\d+', path_d)
-    y_coords = []
-    for i, val in enumerate(coords):
-        # In M x y, L x y, C ... x y format, y is every 2nd value
-        if i % 2 == 1 and i > 0:  # Skip the first x (for M command)
-            y_coords.append(float(val))
-    
-    if not y_coords:
-        return None
-    
-    y_start = min(y_coords)
-    y_end = max(y_coords)
-    
-    return path_d, y_start, y_end
+    return xs
 
 
+# ---------------------------------------------------------------------------
+# SVG content parsers — extract line from full SVG file
+# ---------------------------------------------------------------------------
+def parse_svg_polyline(svg_content: str, image_height: int) -> np.ndarray | None:
+    """Parse <polyline id="...split..." points="x,y x,y ..."> from SVG content."""
+    match = re.search(
+        r'<polyline[^>]*\bid\s*=\s*["\'][^"\']*split[^"\']*["\'][^>]*\bpoints\s*=\s*["\']([^"\']+)["\']',
+        svg_content, re.IGNORECASE | re.DOTALL,
+    )
+    if not match:
+        return None
+    
+    xs = np.full(image_height, -1, dtype=np.int32)
+    points_str = match.group(1)
+    
+    for pair in points_str.strip().split():
+        parts = pair.split(',')
+        if len(parts) == 2:
+            try:
+                x = int(round(float(parts[0])))
+                y = int(round(float(parts[1])))
+                if 0 <= y < image_height:
+                    xs[y] = x
+            except ValueError:
+                pass
+    
+    valid_count = int((xs >= 0).sum())
+    return xs if valid_count > 10 else None
+
+
+def parse_svg_split_path(svg_content: str, image_height: int) -> np.ndarray | None:
+    """Parse <path id="...split..." d="..."> from SVG content."""
+    match = re.search(
+        r'<path[^>]*\bid\s*=\s*["\'][^"\']*split[^"\']*["\'][^>]*\bd\s*=\s*["\']([^"\']+)["\']',
+        svg_content, re.IGNORECASE | re.DOTALL,
+    )
+    if not match:
+        return None
+    
+    d_string = match.group(1)
+    if not d_string.strip():
+        return None
+    
+    return parse_svg_path_d(d_string, image_height)
+
+
+def parse_svg_any_line(svg_content: str, image_height: int) -> np.ndarray | None:
+    """Try to extract split line from SVG: polyline first, then path."""
+    result = parse_svg_polyline(svg_content, image_height)
+    if result is not None:
+        return result
+    return parse_svg_split_path(svg_content, image_height)
+
+
+# ---------------------------------------------------------------------------
+# Main import function
+# ---------------------------------------------------------------------------
 def import_overlays(
     svg_folder: Path,
     source_image_folder: Optional[Path] = None,
@@ -259,6 +265,7 @@ def import_overlays(
         print(f'Not a directory: {svg_folder}')
         return
     
+    # Find SVG files (prefer *_overlay.svg, fallback to *.svg)
     svg_files = sorted(svg_folder.glob('*_overlay.svg'))
     if not svg_files:
         svg_files = sorted(svg_folder.glob('*.svg'))
@@ -269,10 +276,9 @@ def import_overlays(
     
     # Determine source image folder
     if source_image_folder is None:
-        # Assume SVGs were exported from parent folder's overlays
         source_image_folder = svg_folder.parent
-    
     source_image_folder = Path(source_image_folder)
+    
     overlays_path = source_image_folder / OVERLAYS_FILENAME
     
     # Load existing overlays
@@ -285,24 +291,20 @@ def import_overlays(
     print(f'Importing {len(svg_files)} SVG file(s)...')
     
     for svg_path in svg_files:
-        # Extract original image filename from SVG name
-        # e.g., "gold_00013_overlay.svg" → "gold_00013.jpg"
+        # Get image stem: "gold_00014_overlay.svg" → "gold_00014"
         stem = svg_path.stem.replace('_overlay', '')
         
-        # Find matching original image
+        # Find matching original image file
         orig_filename = None
         orig_path = None
-        for ext in ['.jpg', '.jpeg', '.png', '.tif', '.tiff', '.bmp']:
-            candidate = source_image_folder / f'{stem}{ext}'
-            if candidate.exists():
-                orig_filename = candidate.name
-                orig_path = candidate
-                break
-            # Try uppercase
-            candidate = source_image_folder / f'{stem}{ext.upper()}'
-            if candidate.exists():
-                orig_filename = candidate.name
-                orig_path = candidate
+        for ext in ('.jpg', '.jpeg', '.png', '.tif', '.tiff', '.bmp'):
+            for e in (ext, ext.upper()):
+                candidate = source_image_folder / f'{stem}{e}'
+                if candidate.exists():
+                    orig_filename = candidate.name
+                    orig_path = candidate
+                    break
+            if orig_filename:
                 break
         
         if orig_filename is None:
@@ -310,7 +312,7 @@ def import_overlays(
             stats['skipped'] += 1
             continue
         
-        # Get image dimensions
+        # Get image height
         try:
             img = Image.open(orig_path)
             img_h = img.height
@@ -319,33 +321,35 @@ def import_overlays(
             stats['errors'] += 1
             continue
         
-        # Extract path from SVG
-        result = extract_path_from_svg(svg_path)
-        if result is None:
-            stats['skipped'] += 1
-            continue
-        
-        path_d, y_start, y_end = result
-        
-        # Rasterize the path
+        # Read SVG content
         try:
-            xs = parse_svg_path_d(path_d, img_h)
+            svg_content = svg_path.read_text(encoding='utf-8')
         except Exception as e:
-            print(f'  ERROR {svg_path.name}: failed to parse path: {e}')
+            print(f'  ERROR {svg_path.name}: cannot read file: {e}')
             stats['errors'] += 1
             continue
         
-        # Count valid points
-        valid_count = (xs >= 0).sum()
-        if valid_count < 10:
-            print(f'  WARNING {svg_path.name}: only {valid_count} valid points, skipping')
+        # Parse the line
+        xs = parse_svg_any_line(svg_content, img_h)
+        
+        if xs is None:
+            print(f'  SKIP {svg_path.name}: no parseable split line found')
             stats['skipped'] += 1
             continue
         
-        # Update entry
-        y0 = max(0, int(y_start))
-        y1 = min(img_h - 1, int(y_end))
+        # Count valid points
+        valid_count = int((xs >= 0).sum())
+        if valid_count < 10:
+            print(f'  SKIP {svg_path.name}: only {valid_count} valid points')
+            stats['skipped'] += 1
+            continue
         
+        # Determine y range from actual valid rows
+        valid_rows = np.where(xs >= 0)[0]
+        y0 = int(valid_rows[0])
+        y1 = int(valid_rows[-1])
+        
+        # Store entry
         updated_entries[orig_filename] = {
             'y0': y0,
             'y1': y1,
@@ -353,32 +357,34 @@ def import_overlays(
             'autogen': False,  # Mark as manually edited
         }
         
-        print(f'  ✓ {orig_filename}: {valid_count} valid points, rows {y0}-{y1}')
+        print(f'  OK  {orig_filename}: {valid_count} points, rows {y0}-{y1}')
         stats['success'] += 1
     
+    # Save results
     if updated_entries:
-        # Merge with existing (keep untouched entries)
-        config_used = overlays_data.get('config_used', {})
-        if config_used is None:
-            config_used = {}
+        config_used = overlays_data.get('config_used') or {}
         
         save_json(
             overlays_path,
             {
                 'config_used': config_used,
                 'entries': {**existing_entries, **updated_entries},
-            }
+            },
         )
-        print(f'\nUpdated {overlays_path}')
-        print(f'  {stats["success"]} imported, {stats["skipped"]} skipped, {stats["errors"]} errors')
-        print(f'\nNow re-run the notebook to apply the corrected lines!')
+        print(f'\nSaved to: {overlays_path}')
+        print(f'Results: {stats["success"]} imported, {stats["skipped"]} skipped, {stats["errors"]} errors')
+        print(f'Re-run the notebook to apply your corrections!')
     else:
-        print(f'\nNo entries updated.')
+        print('\nNo entries were updated.')
 
 
+# ---------------------------------------------------------------------------
+# CLI entry point
+# ---------------------------------------------------------------------------
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print('Usage: python import_svg_overlays.py <svg_folder> [source_image_folder]')
+        print('Example: python import_svg_overlays.py BBL/gld/svg_overlays BBL/gld')
         sys.exit(1)
     
     svg_dir = Path(sys.argv[1])
