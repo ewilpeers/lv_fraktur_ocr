@@ -1,0 +1,56 @@
+{
+  "config_used": {
+    "dark_threshold": 140,
+    "gray_mode": "gray",
+    "search_band": [
+      0.3,
+      0.7
+    ],
+    "flank_width": 30,
+    "trace_max_jump": 4,
+    "max_gap_rows": 200,
+    "max_drift_from_seed": 15,
+    "edge_trim_px": 8,
+    "whiten_half_width": 3,
+    "letter_guard_distance": 14,
+    "pad_color_hex": "#E01AD1"
+  },
+  "entries": {
+    "00013.jpg": {
+      "seed_x": 794,
+      "autogen": true
+    },
+    "00014.jpg": {
+      "seed_x": 800,
+      "autogen": true
+    },
+    "00015.jpg": {
+      "seed_x": 780,
+      "autogen": true
+    },
+    "00016.jpg": {
+      "seed_x": 799,
+      "autogen": true
+    },
+    "00017.jpg": {
+      "seed_x": 793,
+      "autogen": true
+    },
+    "00018.jpg": {
+      "seed_x": 838,
+      "autogen": true
+    },
+    "00019.jpg": {
+      "seed_x": 800,
+      "autogen": true
+    },
+    "00020.jpg": {
+      "seed_x": 795,
+      "autogen": true
+    },
+    "00021.jpg": {
+      "seed_x": 895,
+      "autogen": true
+    }
+  }
+}

@@ -31,6 +31,7 @@ from line_detection import (
     load_json_safely,
     save_json,
     trace_from_seed,
+    trace_from_seed_refined,
     xs_from_serializable,
     xs_to_serializable,
 )
@@ -83,10 +84,17 @@ class CorrectionApp:
             self.entries[fn] = e
 
         self.cur_idx = 0
-        self.display_scale = 1.0  # original_px / displayed_px
+        self.display_scale = 1.0  # original_px / displayed_px (combined fit*zoom)
+        self.fit_scale = 1.0      # original_px / displayed_px at fit-to-window
+        self.zoom = 1.0           # user zoom multiplier on top of fit
+        self.pan_x = 0.0          # pan offsets in canvas pixels
+        self.pan_y = 0.0
+        self._panning = False
+        self._pan_start = (0, 0)
         self.current_pil_img: Optional[Image.Image] = None
         self.current_arr: Optional[np.ndarray] = None  # original RGB array
         self.tk_img: Optional[ImageTk.PhotoImage] = None
+        self._img_offset = (0, 0)
 
         self._build_ui()
         self._load_current(initial=True)
@@ -125,6 +133,8 @@ class CorrectionApp:
 
         ttk.Button(top, text='Re-detect (auto)', command=self._redetect_auto
                    ).pack(side=tk.LEFT, padx=(12, 2))
+        ttk.Button(top, text='Fit', command=self._reset_view
+                   ).pack(side=tk.LEFT, padx=2)
 
         ttk.Button(top, text='Save all', command=self.save_all
                    ).pack(side=tk.RIGHT)
@@ -134,7 +144,19 @@ class CorrectionApp:
         self.canvas.pack(fill=tk.BOTH, expand=True, padx=6, pady=4)
         self.canvas.bind('<Motion>', self._on_mouse_move)
         self.canvas.bind('<Button-1>', self._on_click)
+        self.canvas.bind('<ButtonRelease-1>', self._on_click_release)
         self.canvas.bind('<Configure>', lambda _e: self._render())
+        # Zoom: mouse wheel (Linux uses Button-4/Button-5; Windows/Mac use <MouseWheel>)
+        self.canvas.bind('<MouseWheel>', self._on_wheel)
+        self.canvas.bind('<Button-4>', lambda e: self._on_wheel_step(e, +1))
+        self.canvas.bind('<Button-5>', lambda e: self._on_wheel_step(e, -1))
+        # Pan: middle-button drag, or shift+left-drag
+        self.canvas.bind('<Button-2>', self._on_pan_start)
+        self.canvas.bind('<B2-Motion>', self._on_pan_drag)
+        self.canvas.bind('<ButtonRelease-2>', self._on_pan_end)
+        self.canvas.bind('<Shift-Button-1>', self._on_pan_start)
+        self.canvas.bind('<Shift-B1-Motion>', self._on_pan_drag)
+        self.canvas.bind('<Shift-ButtonRelease-1>', self._on_pan_end)
 
         # Status bar
         status = ttk.Frame(self.root)
@@ -148,6 +170,10 @@ class CorrectionApp:
         self.root.bind('<Left>',  lambda _e: self.prev_image())
         self.root.bind('<Right>', lambda _e: self.next_image())
         self.root.bind('<Control-s>', lambda _e: self.save_all())
+        self.root.bind('<KeyPress-0>', lambda _e: self._reset_view())
+        self.root.bind('<KeyPress-plus>',  lambda _e: self._zoom_at_center(+1))
+        self.root.bind('<KeyPress-equal>', lambda _e: self._zoom_at_center(+1))
+        self.root.bind('<KeyPress-minus>', lambda _e: self._zoom_at_center(-1))
 
     # ------------------------------------------------------------------
     # Image (de)load + render
@@ -179,6 +205,10 @@ class CorrectionApp:
         self.lbl_file.config(
             text=f'[{self.cur_idx+1}/{len(self.files)}] {fn}   ({W}\u00d7{H})'
         )
+        # Reset view on image change
+        self.zoom = 1.0
+        self.pan_x = 0.0
+        self.pan_y = 0.0
         self._render()
 
     def _render(self) -> None:
@@ -187,41 +217,98 @@ class CorrectionApp:
         cw = max(1, self.canvas.winfo_width())
         ch = max(1, self.canvas.winfo_height())
         W, H = self.current_pil_img.size
-        scale = min(cw / W, ch / H)
-        if scale <= 0 or scale != scale:  # NaN guard
-            scale = 1.0
-        new_w = max(1, int(W * scale))
-        new_h = max(1, int(H * scale))
-        self.display_scale = W / new_w  # original_px per displayed_px
 
-        # Resample image
-        disp = self.current_pil_img.resize((new_w, new_h), Image.LANCZOS)
-        # Burn the overlay into a copy
+        # fit_scale: original_px per displayed_px when fitted (>=1.0 typical)
+        fit = max(W / cw, H / ch, 1e-6)
+        if fit <= 0 or fit != fit:
+            fit = 1.0
+        self.fit_scale = fit
+        # Effective scale used for display: smaller value = bigger on screen.
+        # display_scale = fit_scale / zoom -> at zoom=1 we fit the window;
+        # at zoom=2 we double the on-screen size.
+        self.display_scale = self.fit_scale / max(self.zoom, 1e-3)
+
+        # Size of the entire image at the current effective scale
+        full_disp_w = max(1, int(round(W / self.display_scale)))
+        full_disp_h = max(1, int(round(H / self.display_scale)))
+
+        # Compute placement: at zoom <= 1, image fits entirely; we ignore pan.
+        if self.zoom <= 1.0 + 1e-6:
+            self.pan_x = 0.0
+            self.pan_y = 0.0
+            ox = (cw - full_disp_w) // 2
+            oy = (ch - full_disp_h) // 2
+            disp = self.current_pil_img.resize((full_disp_w, full_disp_h),
+                                               Image.LANCZOS)
+            disp_arr = np.array(disp)
+            # Burn overlay
+            self._burn_overlay(disp_arr, full_disp_w, full_disp_h)
+            self.tk_img = ImageTk.PhotoImage(Image.fromarray(disp_arr))
+            self.canvas.delete('all')
+            self._img_offset = (ox, oy)
+            self._visible_src_origin = (0, 0)  # source x0,y0 currently rendered
+            self._rendered_src_size = (W, H)   # source w,h currently rendered
+            self.canvas.create_image(ox, oy, anchor='nw', image=self.tk_img)
+            self._update_status()
+            return
+
+        # Zoomed in: render only the visible portion of the source.
+        # Clamp pan so we don't scroll past the image.
+        max_pan_x = max(0.0, full_disp_w - cw)
+        max_pan_y = max(0.0, full_disp_h - ch)
+        self.pan_x = max(0.0, min(max_pan_x, self.pan_x))
+        self.pan_y = max(0.0, min(max_pan_y, self.pan_y))
+
+        # Visible region in displayed coords (within the full displayed image)
+        vis_x0 = int(self.pan_x)
+        vis_y0 = int(self.pan_y)
+        vis_w = min(cw, full_disp_w - vis_x0)
+        vis_h = min(ch, full_disp_h - vis_y0)
+        # Map back to source pixel coords
+        src_x0 = int(round(vis_x0 * self.display_scale))
+        src_y0 = int(round(vis_y0 * self.display_scale))
+        src_x1 = int(round((vis_x0 + vis_w) * self.display_scale))
+        src_y1 = int(round((vis_y0 + vis_h) * self.display_scale))
+        src_x0 = max(0, src_x0); src_y0 = max(0, src_y0)
+        src_x1 = min(W, max(src_x0 + 1, src_x1))
+        src_y1 = min(H, max(src_y0 + 1, src_y1))
+
+        crop = self.current_pil_img.crop((src_x0, src_y0, src_x1, src_y1))
+        disp = crop.resize((max(1, vis_w), max(1, vis_h)), Image.LANCZOS)
+        disp_arr = np.array(disp)
+        self._visible_src_origin = (src_x0, src_y0)
+        self._rendered_src_size = (src_x1 - src_x0, src_y1 - src_y0)
+        self._burn_overlay(disp_arr, vis_w, vis_h,
+                           src_x0=src_x0, src_y0=src_y0)
+        self.tk_img = ImageTk.PhotoImage(Image.fromarray(disp_arr))
+        self.canvas.delete('all')
+        # When zoomed, we draw at the canvas origin
+        self._img_offset = (0, 0)
+        self.canvas.create_image(0, 0, anchor='nw', image=self.tk_img)
+        self._update_status()
+
+    def _burn_overlay(self, disp_arr: np.ndarray, disp_w: int, disp_h: int,
+                      src_x0: int = 0, src_y0: int = 0) -> None:
+        """Draw the red overlay line into disp_arr in place. src_x0/src_y0 are
+        the source-pixel origin of the rendered region (0,0 if not zoomed)."""
         e = self.entries[self.files[self.cur_idx]]
         xs = e.get('xs')
         y0 = e.get('y0', 0)
         y1 = e.get('y1', -1)
-        if xs is not None and y1 >= y0:
-            disp_arr = np.array(disp)
-            for y in range(y0, y1 + 1):
-                x_orig = int(xs[y])
-                if x_orig < 0:
-                    continue
-                dy = int(y / self.display_scale)
-                dx = int(x_orig / self.display_scale)
-                if 0 <= dy < new_h:
-                    lo = max(0, dx - 1)
-                    hi = min(new_w, dx + 2)
+        if xs is None or y1 < y0:
+            return
+        ds = self.display_scale
+        for y in range(y0, y1 + 1):
+            x_orig = int(xs[y])
+            if x_orig < 0:
+                continue
+            dy = int(round((y - src_y0) / ds))
+            dx = int(round((x_orig - src_x0) / ds))
+            if 0 <= dy < disp_h:
+                lo = max(0, dx - 1)
+                hi = min(disp_w, dx + 2)
+                if hi > lo:
                     disp_arr[dy, lo:hi] = (255, 0, 0)
-            disp = Image.fromarray(disp_arr)
-
-        self.tk_img = ImageTk.PhotoImage(disp)
-        self.canvas.delete('all')
-        # Center the image in the canvas
-        self._img_offset = ((cw - new_w) // 2, (ch - new_h) // 2)
-        self.canvas.create_image(self._img_offset[0], self._img_offset[1],
-                                 anchor='nw', image=self.tk_img)
-        self._update_status()
 
     # ------------------------------------------------------------------
     # Coordinate handling
@@ -232,8 +319,12 @@ class CorrectionApp:
         ry = cy - oy
         if rx < 0 or ry < 0:
             return None
-        x = int(rx * self.display_scale)
-        y = int(ry * self.display_scale)
+        # Convert canvas-relative (rx, ry) -> source pixels.
+        # When zoomed: visible region is anchored at _visible_src_origin in
+        # source space, with display_scale = source_px / display_px.
+        sox, soy = getattr(self, '_visible_src_origin', (0, 0))
+        x = int(sox + rx * self.display_scale)
+        y = int(soy + ry * self.display_scale)
         H, W = self.current_arr.shape[:2]
         if 0 <= x < W and 0 <= y < H:
             return x, y
@@ -254,12 +345,94 @@ class CorrectionApp:
             self.lbl_pos.config(text=f'page (x={x}, y={y})   |   (no line at this row)')
 
     def _on_click(self, ev: tk.Event) -> None:
+        # Record press position; act only on release if the user didn't drag.
+        self._click_press = (ev.x, ev.y)
+
+    def _on_click_release(self, ev: tk.Event) -> None:
+        press = getattr(self, '_click_press', None)
+        if press is None:
+            return
+        self._click_press = None
+        if abs(ev.x - press[0]) > 3 or abs(ev.y - press[1]) > 3:
+            return  # was a drag, not a click
         coords = self._canvas_to_image(ev.x, ev.y)
         if coords is None:
             return
         x, _y = coords
-        # Click sets new absolute seed_x and re-traces
         self._set_seed_x(x, mark_manual=True)
+
+    # ------------------------------------------------------------------
+    # Zoom + pan
+    # ------------------------------------------------------------------
+    ZOOM_FACTOR = 1.25
+    ZOOM_MIN = 1.0
+    ZOOM_MAX = 16.0
+
+    def _on_wheel(self, ev: tk.Event) -> None:
+        # Windows / macOS deliver delta in MouseWheel
+        steps = 1 if getattr(ev, 'delta', 0) > 0 else -1
+        self._on_wheel_step(ev, steps)
+
+    def _on_wheel_step(self, ev: tk.Event, direction: int) -> None:
+        # Zoom centered on the cursor: the source pixel under the cursor
+        # should remain under the cursor after the zoom change.
+        coords = self._canvas_to_image(ev.x, ev.y)
+        if coords is None:
+            anchor = None
+        else:
+            anchor = coords  # (src_x, src_y)
+        new_zoom = self.zoom * (self.ZOOM_FACTOR if direction > 0
+                                else 1.0 / self.ZOOM_FACTOR)
+        new_zoom = max(self.ZOOM_MIN, min(self.ZOOM_MAX, new_zoom))
+        if abs(new_zoom - self.zoom) < 1e-6:
+            return
+        # Pre-zoom display_scale and pan
+        old_disp_scale = self.display_scale
+        new_disp_scale = self.fit_scale / max(new_zoom, 1e-3)
+        if anchor is not None and new_zoom > 1.0 + 1e-6:
+            src_x, src_y = anchor
+            # Cursor canvas position under the new scale, with pan adjusted to
+            # keep src_x, src_y aligned with ev.x, ev.y.
+            self.pan_x = src_x / new_disp_scale - ev.x
+            self.pan_y = src_y / new_disp_scale - ev.y
+        elif new_zoom <= 1.0 + 1e-6:
+            self.pan_x = 0.0
+            self.pan_y = 0.0
+        self.zoom = new_zoom
+        self._render()
+
+    def _zoom_at_center(self, direction: int) -> None:
+        # Synthesize a 'wheel event' at canvas center for keyboard zoom
+        cw = max(1, self.canvas.winfo_width())
+        ch = max(1, self.canvas.winfo_height())
+        ev = type('E', (), {'x': cw // 2, 'y': ch // 2, 'delta': 0})()
+        self._on_wheel_step(ev, direction)
+
+    def _reset_view(self) -> None:
+        self.zoom = 1.0
+        self.pan_x = 0.0
+        self.pan_y = 0.0
+        self._render()
+
+    def _on_pan_start(self, ev: tk.Event) -> None:
+        self._panning = True
+        self._pan_start = (ev.x, ev.y, self.pan_x, self.pan_y)
+        self.canvas.config(cursor='fleur')
+
+    def _on_pan_drag(self, ev: tk.Event) -> None:
+        if not self._panning:
+            return
+        sx, sy, p0x, p0y = self._pan_start
+        dx = ev.x - sx
+        dy = ev.y - sy
+        # Drag the image: moving mouse right shifts pan_x left (image moves right)
+        self.pan_x = p0x - dx
+        self.pan_y = p0y - dy
+        self._render()
+
+    def _on_pan_end(self, _ev: tk.Event) -> None:
+        self._panning = False
+        self.canvas.config(cursor='')
 
     # ------------------------------------------------------------------
     # Seed updates
@@ -270,7 +443,7 @@ class CorrectionApp:
         H, W = self.current_arr.shape[:2]
         new_seed_x = max(0, min(W - 1, int(new_seed_x)))
 
-        xs, (y0, y1) = trace_from_seed(self.current_arr, new_seed_x, self.cfg)
+        xs, (y0, y1) = trace_from_seed_refined(self.current_arr, new_seed_x, self.cfg)
         e['xs'] = xs
         e['y0'] = y0
         e['y1'] = y1
