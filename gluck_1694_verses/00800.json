@@ -2,7 +2,6 @@
 "page": 800,
 "max_verse": 12,
 "full_list": [
-1,
 2,
 3,
 4,
@@ -13,7 +12,7 @@
 9,
 10,
 11,
-12
+12,13
 ],
 "alternatives": [],
 "chapter_starts_here": false,
