@@ -158,6 +158,15 @@ class GluckEditor(tk.Tk):
         self.zoom = 1.0
         self.tk_image = None
         self.pan_start = None
+        # Sticky view across navigation: pan stored as fractions in [0,1]
+        # of the *scrollable region* (so it adapts to differing page sizes).
+        # zoom is global. Initialized lazily on first image load.
+        self.sticky_zoom = None
+        self.sticky_pan_x = 0.0
+        self.sticky_pan_y = 0.0
+        # Suppress saving sticky state during programmatic scrolls right
+        # after loading a new image.
+        self._suppress_pan_capture = False
 
         self._build_ui()
         self._bind_keys()
@@ -215,8 +224,16 @@ class GluckEditor(tk.Tk):
         main.add(img_frame, weight=3)
 
         self.canvas = tk.Canvas(img_frame, bg="gray20", highlightthickness=0)
-        hbar = ttk.Scrollbar(img_frame, orient=tk.HORIZONTAL, command=self.canvas.xview)
-        vbar = ttk.Scrollbar(img_frame, orient=tk.VERTICAL, command=self.canvas.yview)
+
+        # Wrap scrollbar -> canvas commands so dragging the bars also captures sticky pan
+        def _xview(*args):
+            self.canvas.xview(*args)
+            self._capture_pan()
+        def _yview(*args):
+            self.canvas.yview(*args)
+            self._capture_pan()
+        hbar = ttk.Scrollbar(img_frame, orient=tk.HORIZONTAL, command=_xview)
+        vbar = ttk.Scrollbar(img_frame, orient=tk.VERTICAL, command=_yview)
         self.canvas.configure(xscrollcommand=hbar.set, yscrollcommand=vbar.set)
         vbar.pack(side=tk.RIGHT, fill=tk.Y)
         hbar.pack(side=tk.BOTTOM, fill=tk.X)
@@ -434,11 +451,33 @@ class GluckEditor(tk.Tk):
             self.status_var.set(f"Image decode failed: {e}")
             self.original_pil = None
             return
-        self.zoom = 1.0
+        # Apply sticky zoom (use 1.0 only on the very first image of the session)
+        if self.sticky_zoom is None:
+            self.sticky_zoom = 1.0
+        self.zoom = self.sticky_zoom
         self._render_image()
-        # reset pan
-        self.canvas.xview_moveto(0)
-        self.canvas.yview_moveto(0)
+        # Apply sticky pan as fractions of the (new) scrollregion.
+        # Tk's xview_moveto expects a fraction in [0,1] of the scrollregion.
+        # The fraction maps to "left edge of viewport" — same convention we
+        # used to capture, so identical fractions yield equivalent placement.
+        self._suppress_pan_capture = True
+        self.canvas.xview_moveto(self.sticky_pan_x)
+        self.canvas.yview_moveto(self.sticky_pan_y)
+        # release the suppression after Tk has processed pending events
+        self.after_idle(self._release_pan_suppression)
+
+    def _release_pan_suppression(self):
+        self._suppress_pan_capture = False
+
+    def _capture_pan(self):
+        """Save current scroll fractions to sticky state."""
+        if self._suppress_pan_capture or self.original_pil is None:
+            return
+        # xview/yview return (left, right) fractions; we store the left edge
+        x_frac = self.canvas.xview()[0]
+        y_frac = self.canvas.yview()[0]
+        self.sticky_pan_x = x_frac
+        self.sticky_pan_y = y_frac
 
     def _render_image(self):
         if self.original_pil is None:
@@ -471,6 +510,7 @@ class GluckEditor(tk.Tk):
         if new_zoom == old_zoom:
             return
         self.zoom = new_zoom
+        self.sticky_zoom = new_zoom
         self._render_image()
         # Adjust scroll so the cursor stays on the same image point
         ratio = new_zoom / old_zoom
@@ -481,6 +521,7 @@ class GluckEditor(tk.Tk):
         sh = max(1, int(self.original_pil.size[1] * new_zoom))
         self.canvas.xview_moveto(max(0, (new_cx - event.x) / sw))
         self.canvas.yview_moveto(max(0, (new_cy - event.y) / sh))
+        self._capture_pan()
 
     def _pan_start(self, event):
         self.canvas.scan_mark(event.x, event.y)
@@ -490,9 +531,11 @@ class GluckEditor(tk.Tk):
         if self.pan_start is None:
             return
         self.canvas.scan_dragto(event.x, event.y, gain=1)
+        self._capture_pan()
 
     def _pan_end(self, event):
         self.pan_start = None
+        self._capture_pan()
 
     # ----- editor dirty tracking -----
     def _on_modified(self, event=None):
