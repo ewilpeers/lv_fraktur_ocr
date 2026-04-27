@@ -1,7 +1,7 @@
 {
 "page": 1151,
 "max_verse": 12,
-"full_list": [
+"full_list": [4,5,6,1,2,3,
 4,
 5,
 6,
@@ -10,7 +10,7 @@
 9,
 10,
 11,
-12
+12,1
 ],
 "alternatives": [],
 "chapter_starts_here": true,
