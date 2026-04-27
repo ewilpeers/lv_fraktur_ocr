@@ -162,8 +162,15 @@ class GluckEditor(tk.Tk):
         # of the *scrollable region* (so it adapts to differing page sizes).
         # zoom is global. Initialized lazily on first image load.
         self.sticky_zoom = None
+        # Two regimes, kept independently so a small→large→small navigation
+        # restores the small-regime offset on the third page.
+        # Large regime (image bigger than viewport): scroll fractions [0,1].
         self.sticky_pan_x = 0.0
         self.sticky_pan_y = 0.0
+        # Small regime (image fits inside viewport): canvas-pixel offset of
+        # the image's top-left from the canvas origin.
+        self.sticky_offset_x = 0
+        self.sticky_offset_y = 0
         # Suppress saving sticky state during programmatic scrolls right
         # after loading a new image.
         self._suppress_pan_capture = False
@@ -456,28 +463,98 @@ class GluckEditor(tk.Tk):
             self.sticky_zoom = 1.0
         self.zoom = self.sticky_zoom
         self._render_image()
-        # Apply sticky pan as fractions of the (new) scrollregion.
-        # Tk's xview_moveto expects a fraction in [0,1] of the scrollregion.
-        # The fraction maps to "left edge of viewport" — same convention we
-        # used to capture, so identical fractions yield equivalent placement.
+        # Force layout pass so canvas.winfo_width()/height() are accurate
+        # before we decide which regime each axis is in.
+        self.canvas.update_idletasks()
+        # Apply sticky position. Each axis independently picks its regime.
         self._suppress_pan_capture = True
-        self.canvas.xview_moveto(self.sticky_pan_x)
-        self.canvas.yview_moveto(self.sticky_pan_y)
+        self._apply_sticky_position()
         # release the suppression after Tk has processed pending events
         self.after_idle(self._release_pan_suppression)
 
     def _release_pan_suppression(self):
         self._suppress_pan_capture = False
 
+    def _scaled_size(self):
+        """Current scaled image dimensions (zw, zh), or (0,0) if no image."""
+        if self.original_pil is None:
+            return (0, 0)
+        w, h = self.original_pil.size
+        return (max(1, int(w * self.zoom)), max(1, int(h * self.zoom)))
+
+    def _viewport_size(self):
+        """Canvas viewport dimensions in pixels."""
+        return (self.canvas.winfo_width(), self.canvas.winfo_height())
+
+    def _axis_is_small(self, axis):
+        """Return True if the image is smaller than viewport on this axis ('x' or 'y')."""
+        zw, zh = self._scaled_size()
+        vw, vh = self._viewport_size()
+        # Tk widgets may have winfo_*=1 before mapping; treat that as "unknown,
+        # don't pretend small-regime"
+        if axis == 'x':
+            return vw > 1 and zw < vw
+        else:
+            return vh > 1 and zh < vh
+
+    def _apply_sticky_position(self):
+        """Apply sticky offset/fraction to the canvas, per-axis by regime."""
+        if self.original_pil is None:
+            return
+        # X axis
+        if self._axis_is_small('x'):
+            self._set_image_offset_x(self.sticky_offset_x)
+        else:
+            self.canvas.xview_moveto(self.sticky_pan_x)
+        # Y axis
+        if self._axis_is_small('y'):
+            self._set_image_offset_y(self.sticky_offset_y)
+        else:
+            self.canvas.yview_moveto(self.sticky_pan_y)
+
+    def _set_image_offset_x(self, ox):
+        """Move the image so its left edge is at canvas-x ox, clamping sensibly."""
+        if self.canvas_img_id is None:
+            return
+        zw, _ = self._scaled_size()
+        vw, _ = self._viewport_size()
+        # Clamp so image stays within viewport (small regime: don't let it
+        # disappear out the side)
+        max_off = max(0, vw - zw)
+        ox = max(0, min(ox, max_off))
+        cur_x, _ = self.canvas.coords(self.canvas_img_id)
+        self.canvas.move(self.canvas_img_id, ox - cur_x, 0)
+        # Also keep canvas scroll at 0 in this axis (no scrolling needed)
+        self.canvas.xview_moveto(0)
+
+    def _set_image_offset_y(self, oy):
+        if self.canvas_img_id is None:
+            return
+        _, zh = self._scaled_size()
+        _, vh = self._viewport_size()
+        max_off = max(0, vh - zh)
+        oy = max(0, min(oy, max_off))
+        _, cur_y = self.canvas.coords(self.canvas_img_id)
+        self.canvas.move(self.canvas_img_id, 0, oy - cur_y)
+        self.canvas.yview_moveto(0)
+
     def _capture_pan(self):
-        """Save current scroll fractions to sticky state."""
+        """Save current pan to sticky state — per-axis by regime."""
         if self._suppress_pan_capture or self.original_pil is None:
             return
-        # xview/yview return (left, right) fractions; we store the left edge
-        x_frac = self.canvas.xview()[0]
-        y_frac = self.canvas.yview()[0]
-        self.sticky_pan_x = x_frac
-        self.sticky_pan_y = y_frac
+        if self._axis_is_small('x'):
+            # Pixel offset: image's current x in canvas coords
+            if self.canvas_img_id is not None:
+                cur_x, _ = self.canvas.coords(self.canvas_img_id)
+                self.sticky_offset_x = int(cur_x)
+        else:
+            self.sticky_pan_x = self.canvas.xview()[0]
+        if self._axis_is_small('y'):
+            if self.canvas_img_id is not None:
+                _, cur_y = self.canvas.coords(self.canvas_img_id)
+                self.sticky_offset_y = int(cur_y)
+        else:
+            self.sticky_pan_y = self.canvas.yview()[0]
 
     def _render_image(self):
         if self.original_pil is None:
@@ -491,7 +568,10 @@ class GluckEditor(tk.Tk):
             resized = self.original_pil
         self.tk_image = ImageTk.PhotoImage(resized)
         self.canvas.delete("all")
+        # Place at origin; sticky-position application moves it afterward.
         self.canvas_img_id = self.canvas.create_image(0, 0, anchor=tk.NW, image=self.tk_image)
+        # scrollregion bounds the scrollable area; for the small regime this
+        # equals the image size (no extra scrolling area), large regime same.
         self.canvas.config(scrollregion=(0, 0, zw, zh))
 
     def _on_zoom(self, event):
@@ -502,7 +582,7 @@ class GluckEditor(tk.Tk):
             direction = 1 if event.num == 4 else -1
         factor = 1.15 if direction > 0 else 1 / 1.15
 
-        # Get cursor position in canvas coords for cursor-anchored zoom
+        # Get cursor position in canvas coords for cursor-anchored zoom (large regime)
         cx = self.canvas.canvasx(event.x)
         cy = self.canvas.canvasy(event.y)
         old_zoom = self.zoom
@@ -512,25 +592,67 @@ class GluckEditor(tk.Tk):
         self.zoom = new_zoom
         self.sticky_zoom = new_zoom
         self._render_image()
-        # Adjust scroll so the cursor stays on the same image point
+        # After re-rendering the image item is at (0,0) and viewport scroll is 0.
+        # Per-axis positioning, regime-aware:
+        sw = max(1, int(self.original_pil.size[0] * new_zoom))
+        sh = max(1, int(self.original_pil.size[1] * new_zoom))
         ratio = new_zoom / old_zoom
         new_cx = cx * ratio
         new_cy = cy * ratio
-        # how much to scroll so (new_cx, new_cy) is under (event.x, event.y)
-        sw = max(1, int(self.original_pil.size[0] * new_zoom))
-        sh = max(1, int(self.original_pil.size[1] * new_zoom))
-        self.canvas.xview_moveto(max(0, (new_cx - event.x) / sw))
-        self.canvas.yview_moveto(max(0, (new_cy - event.y) / sh))
+        if self._axis_is_small('x'):
+            # Small regime: place image at the previously-sticky offset
+            self._set_image_offset_x(self.sticky_offset_x)
+        else:
+            # Large regime: cursor-anchored scroll
+            self.canvas.xview_moveto(max(0, (new_cx - event.x) / sw))
+        if self._axis_is_small('y'):
+            self._set_image_offset_y(self.sticky_offset_y)
+        else:
+            self.canvas.yview_moveto(max(0, (new_cy - event.y) / sh))
         self._capture_pan()
 
     def _pan_start(self, event):
-        self.canvas.scan_mark(event.x, event.y)
+        # Track the cursor position so we can compute deltas each tick.
         self.pan_start = (event.x, event.y)
 
     def _pan_drag(self, event):
-        if self.pan_start is None:
+        if self.pan_start is None or self.canvas_img_id is None:
             return
-        self.canvas.scan_dragto(event.x, event.y, gain=1)
+        dx = event.x - self.pan_start[0]
+        dy = event.y - self.pan_start[1]
+        self.pan_start = (event.x, event.y)
+
+        # X axis
+        if self._axis_is_small('x'):
+            # Move the image item; clamp within viewport.
+            cur_x, _ = self.canvas.coords(self.canvas_img_id)
+            zw, _ = self._scaled_size()
+            vw, _ = self._viewport_size()
+            new_x = max(0, min(cur_x + dx, max(0, vw - zw)))
+            self.canvas.move(self.canvas_img_id, new_x - cur_x, 0)
+        else:
+            # Scroll the viewport. xview_scroll takes integer "units"; for
+            # smooth pixel-precise dragging we instead compute a fraction.
+            zw, _ = self._scaled_size()
+            if zw > 0:
+                cur_frac = self.canvas.xview()[0]
+                new_frac = max(0.0, min(1.0, cur_frac - dx / zw))
+                self.canvas.xview_moveto(new_frac)
+
+        # Y axis
+        if self._axis_is_small('y'):
+            _, cur_y = self.canvas.coords(self.canvas_img_id)
+            _, zh = self._scaled_size()
+            _, vh = self._viewport_size()
+            new_y = max(0, min(cur_y + dy, max(0, vh - zh)))
+            self.canvas.move(self.canvas_img_id, 0, new_y - cur_y)
+        else:
+            _, zh = self._scaled_size()
+            if zh > 0:
+                cur_frac = self.canvas.yview()[0]
+                new_frac = max(0.0, min(1.0, cur_frac - dy / zh))
+                self.canvas.yview_moveto(new_frac)
+
         self._capture_pan()
 
     def _pan_end(self, event):
