@@ -4,7 +4,6 @@
 "full_list": [
 13,
 14,
-4,
 15,
 16,
 17,
@@ -14,7 +13,7 @@
 21,
 1,
 2,
-3
+3, 4, 5
 ],
 "alternatives": [],
 "chapter_starts_here": true,
